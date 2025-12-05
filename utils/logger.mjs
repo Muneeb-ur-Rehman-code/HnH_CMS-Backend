@@ -75,6 +75,8 @@ export const logger = (isDetailed = false) => (req, res, next) => {
         console.log('\n');
 
         console.log(`${BLUE}Method: ${methodColor}${req.method}${RESET}`);
+        console.log(`${BLUE}Timestamp: ${CYAN}${timestamp}${RESET}`);
+        console.log(`${BLUE}IP:     ${CYAN}${req.ipRESET}`);
         console.log(`${BLUE}Path:   ${CYAN}${req.originalUrl}${RESET}`);
         console.log(`${BLUE}Body:   ${MAGENTA}${bodyContent}${RESET}`);
         console.log(`${BLUE}Params: ${MAGENTA}${paramsContent}${RESET}`);

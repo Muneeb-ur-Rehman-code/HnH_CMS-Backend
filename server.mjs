@@ -3,6 +3,8 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import path, { dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 //====================================================FILES IMPORTS
 
@@ -10,34 +12,54 @@ import connectDB from './config/db.mjs';
 import { X, T, P } from './config/constants.mjs';
 import { logger } from './utils/logger.mjs';
 import { verifyEmailConnection } from './utils/emailService.mjs';
+import { verifySMSConnection } from './utils/smsService.mjs';
 // import { sendNotificationEmail } from './utils/emailService.mjs';
-
+// import { sendOTPviaSMS } from './utils/smsService.mjs';
+import routes from "./routes/Routes.mjs"
 
 //====================================================INITIALIZATION
 
 dotenv.config({ quiet: true });
 const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(logger(false));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 //====================================================GLOBAL MIDDLEWARES
 
-//
+app.use(cors());
+app.use(express.json());
+app.use(logger(false));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-//====================================================API ROUTES 
+//====================================================API ROUTES
 
-//
+app.use('/api', routes);
+
+//====================================================HEALTH CHECK DIRECT API'S
+
+app.get(['/', '/health', '/health-check'], (req, res) => { res.json({ message: 'Health OK' }); });
 
 //====================================================BUILD FOLDER SERVE
 
 //
 
-//====================================================HEALTH CHECK DIRECT API'S
+//====================================================404 + 500 Handle
 
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: 'Route not found'
+    });
+});
 
-app.get(['/', '/health', '/health-check'], (req, res) => { res.json({ message: 'Health OK' }); });
-
+app.use((err, req, res, next) => {
+    console.error('Server error:', err);
+    res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+});
 
 //====================================================APP LISTEN PORT
 
@@ -47,6 +69,7 @@ const startServer = async () => {
     console.log('\n\n' + P + 'Connecting to MongoDB...');
     await connectDB();
     await verifyEmailConnection();
+    // await verifySMSConnection();
 
     // test email credentials and send an email to yourself here
     // await sendNotificationEmail(
@@ -54,6 +77,8 @@ const startServer = async () => {
     //     'Your document has been reviewed and approved. Please check your dashboard for next steps.'
     // );
 
+    // test SMS otp
+    // sendOTPviaSMS("+923197877750", "4586");
 
 
     app.listen(PORT, () => { console.log(T + `Server is running on port ${PORT}`); });

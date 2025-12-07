@@ -1,76 +1,454 @@
-// src/models/Profiles/StudentProfile.model.ts
-import mongoose, { Schema } from 'mongoose';
+// models/StudentProfile.mjs
+import mongoose from 'mongoose';
 
-const StudentSchema = new mongoose.Schema({
-    userId: {
-        type: Schema.Types.ObjectId,
-        ref: 'User',
-        required: true,
-        unique: true
+const { Schema, model } = mongoose;
+
+// ============================================
+// ENUMS
+// ============================================
+export const GENDER = Object.freeze({
+    MALE: 'MALE',
+    FEMALE: 'FEMALE',
+    OTHER: 'OTHER',
+    PREFER_NOT_TO_SAY: 'PREFER_NOT_TO_SAY'
+});
+
+export const EDUCATION_LEVEL = Object.freeze({
+    HIGH_SCHOOL: 'HIGH_SCHOOL',
+    DIPLOMA: 'DIPLOMA',
+    BACHELORS: 'BACHELORS',
+    MASTERS: 'MASTERS',
+    PHD: 'PHD',
+    OTHER: 'OTHER'
+});
+
+export const ENGLISH_TEST = Object.freeze({
+    IELTS: 'IELTS',
+    TOEFL: 'TOEFL',
+    PTE: 'PTE',
+    DUOLINGO: 'DUOLINGO',
+    CAMBRIDGE: 'CAMBRIDGE',
+    OTHER: 'OTHER',
+    NONE: 'NONE'
+});
+
+// ============================================
+// SUB-SCHEMAS
+// ============================================
+const addressSchema = new Schema(
+    {
+        street: {
+            type: String,
+            trim: true,
+            maxlength: [200, 'Street address cannot exceed 200 characters'],
+            default: null
+        },
+        city: {
+            type: String,
+            trim: true,
+            maxlength: [100, 'City cannot exceed 100 characters'],
+            default: null
+        },
+        state: {
+            type: String,
+            trim: true,
+            maxlength: [100, 'State cannot exceed 100 characters'],
+            default: null
+        },
+        postalCode: {
+            type: String,
+            trim: true,
+            maxlength: [20, 'Postal code cannot exceed 20 characters'],
+            default: null
+        },
+        country: {
+            type: String,
+            trim: true,
+            maxlength: [100, 'Country cannot exceed 100 characters'],
+            default: null
+        }
     },
+    { _id: false }
+);
 
-    dateOfBirth: Date,
-    nationality: String,
-    passportNumber: String,
-    passportExpiry: Date,
-    address: String,
-    city: String,
-    country: String,
-
-    educationLevel: {
-        type: String,
-        enum: ['high_school', 'bachelors', 'masters', 'phd', 'other']
+const englishProficiencySchema = new Schema(
+    {
+        testType: {
+            type: String,
+            enum: {
+                values: Object.values(ENGLISH_TEST),
+                message: 'Invalid English test type: {VALUE}'
+            },
+            default: ENGLISH_TEST.NONE
+        },
+        overallScore: {
+            type: Number,
+            min: [0, 'Score cannot be negative'],
+            max: [200, 'Score cannot exceed 200'],
+            default: null
+        },
+        testDate: {
+            type: Date,
+            default: null
+        }
     },
+    { _id: false }
+);
 
-    currentInstitution: String,
-    graduationYear: {
-        type: Number,
-        min: [1950, "Graduation year must be after 1950"],
-        max: new Date().getFullYear() + 10,
-        required: false
+// ============================================
+// MAIN SCHEMA
+// ============================================
+const studentProfileSchema = new Schema(
+    {
+        // ---- Link to User ----
+        userId: {
+            type: Schema.Types.ObjectId,
+            ref: 'User',
+            required: [true, 'User ID is required'],
+            unique: true,
+            index: true
+        },
+
+        // ---- Personal Info ----
+        nationality: {
+            type: String,
+            trim: true,
+            maxlength: [100, 'Nationality cannot exceed 100 characters'],
+            default: null
+        },
+
+        // ---- Passport Info ----
+        passportNumber: {
+            type: String,
+            trim: true,
+            uppercase: true,
+            default: null,
+            validate: {
+                validator: function (value) {
+                    if (!value) return true;
+                    // Alphanumeric, 6-20 characters
+                    return /^[A-Z0-9]{6,20}$/.test(value);
+                },
+                message: 'Passport number must be 6-20 alphanumeric characters'
+            }
+        },
+
+        passportExpiry: {
+            type: Date,
+            default: null,
+            validate: {
+                validator: function (value) {
+                    if (!value) return true;
+                    // Must be in the future
+                    return value > new Date();
+                },
+                message: 'Passport expiry must be a future date'
+            }
+        },
+
+        // ---- Address ----
+        address: {
+            type: addressSchema,
+            default: () => ({})
+        },
+
+        // ---- Education ----
+        educationLevel: {
+            type: String,
+            enum: {
+                values: Object.values(EDUCATION_LEVEL),
+                message: 'Invalid education level: {VALUE}'
+            },
+            default: null
+        },
+
+        currentInstitution: {
+            type: String,
+            trim: true,
+            maxlength: [200, 'Institution name cannot exceed 200 characters'],
+            default: null
+        },
+
+        graduationYear: {
+            type: Number,
+            min: [1950, 'Graduation year cannot be before 1950'],
+            max: [new Date().getFullYear() + 10, 'Graduation year cannot be more than 10 years in future'],
+            default: null,
+            validate: {
+                validator: function (value) {
+                    if (!value) return true;
+                    return Number.isInteger(value);
+                },
+                message: 'Graduation year must be a whole number'
+            }
+        },
+
+        lastGpa: {
+            type: Number,
+            min: [0.0, 'GPA cannot be negative'],
+            max: [4.0, 'GPA cannot exceed 4.0'],
+            default: null
+        },
+
+        // ---- English Proficiency ----
+        englishProficiency: {
+            type: englishProficiencySchema,
+            default: () => ({})
+        },
+
+        // ---- Soft Delete ----
+        deletedAt: {
+            type: Date,
+            default: null,
+            index: true
+        }
     },
+    {
+        timestamps: true
+    }
+);
 
-    gpa: {
-        type: number,
-        min: 0.0,
-        max: 4.0,
-    },
+// ============================================
+// INDEXES
+// ============================================
+studentProfileSchema.index({ passportNumber: 1 }, { sparse: true });
+studentProfileSchema.index({ nationality: 1 });
 
-    englishProficiency: {
-        type: String,
-        enum: ['ielts', 'toefl', 'pte', 'duolingo', 'none']
-    },
+// ============================================
+// QUERY MIDDLEWARE - Exclude soft deleted
+// ============================================
+studentProfileSchema.pre(/^find/, function (next) {
+    if (this.getOptions().includeSoftDeleted !== true) {
+        this.where({ deletedAt: null });
+    }
+    next();
+});
 
-    englishScore: String,
-    englishTestDate: Date,
+// ============================================
+// VIRTUALS
+// ============================================
+studentProfileSchema.virtual('isPassportExpired').get(function () {
+    if (!this.passportExpiry) return null;
+    return this.passportExpiry < new Date();
+});
 
-    targetCountry: String,
-    targetUniversity: String,
-    targetCourse: String,
-    intakePreference: {
-        type: String,
-        enum: ['spring', 'fall', 'summer', 'winter', 'flexible']
-    },
-    budget: {
-        type: Schema.Types.Decimal128,
-        required: true,
-        min: [0, 'Budget cannot be negative']
-    },
+studentProfileSchema.virtual('isPassportExpiringSoon').get(function () {
+    if (!this.passportExpiry) return null;
+    const sixMonthsFromNow = new Date();
+    sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+    return this.passportExpiry < sixMonthsFromNow && this.passportExpiry > new Date();
+});
 
-    applicationStatus: {
-        type: String,
-        enum: ['potential_client', 'lead', 'active', 'completed', 'cancelled'],
-        default: 'lead'
-    },
+studentProfileSchema.virtual('hasCompleteAddress').get(function () {
+    return !!(
+        this.address?.street &&
+        this.address?.city &&
+        this.address?.country
+    );
+});
 
+studentProfileSchema.virtual('isDeleted').get(function () {
+    return this.deletedAt !== null;
+});
 
+studentProfileSchema.virtual('user', {
+    ref: 'User',
+    localField: 'userId',
+    foreignField: '_id',
+    justOne: true
+});
 
+// ============================================
+// INSTANCE METHODS
+// ============================================
 
-}, { timestamps: true });
+/**
+ * Update passport info
+ * @param {string} passportNumber
+ * @param {Date} passportExpiry
+ * @returns {Promise<StudentProfile>}
+ */
+studentProfileSchema.methods.updatePassport = function (passportNumber, passportExpiry) {
+    if (passportNumber) {
+        this.passportNumber = passportNumber;
+    }
+    if (passportExpiry) {
+        this.passportExpiry = passportExpiry;
+    }
+    return this.save();
+};
 
+/**
+ * Update address
+ * @param {Object} addressData
+ * @returns {Promise<StudentProfile>}
+ */
+studentProfileSchema.methods.updateAddress = function (addressData) {
+    const { street, city, state, postalCode, country } = addressData;
 
+    if (street !== undefined) this.address.street = street;
+    if (city !== undefined) this.address.city = city;
+    if (state !== undefined) this.address.state = state;
+    if (postalCode !== undefined) this.address.postalCode = postalCode;
+    if (country !== undefined) this.address.country = country;
 
-const Student = mongoose.model('Student', StudentSchema);
-export default Student;
+    return this.save();
+};
 
-StudentSchema.index({ userId: 1 });
+/**
+ * Update education info
+ * @param {Object} educationData
+ * @returns {Promise<StudentProfile>}
+ */
+studentProfileSchema.methods.updateEducation = function (educationData) {
+    const { educationLevel, currentInstitution, graduationYear, lastGpa } = educationData;
+
+    if (educationLevel !== undefined) this.educationLevel = educationLevel;
+    if (currentInstitution !== undefined) this.currentInstitution = currentInstitution;
+    if (graduationYear !== undefined) this.graduationYear = graduationYear;
+    if (lastGpa !== undefined) this.lastGpa = lastGpa;
+
+    return this.save();
+};
+
+/**
+ * Update English proficiency
+ * @param {Object} proficiencyData
+ * @returns {Promise<StudentProfile>}
+ */
+studentProfileSchema.methods.updateEnglishProficiency = function (proficiencyData) {
+    const { testType, overallScore, testDate } = proficiencyData;
+
+    if (testType !== undefined) this.englishProficiency.testType = testType;
+    if (overallScore !== undefined) this.englishProficiency.overallScore = overallScore;
+    if (testDate !== undefined) this.englishProficiency.testDate = testDate;
+
+    return this.save();
+};
+
+/**
+ * Get profile completion percentage
+ * @returns {number}
+ */
+studentProfileSchema.methods.getCompletionPercentage = function () {
+    const fields = [
+        this.nationality,
+        this.passportNumber,
+        this.passportExpiry,
+        this.address?.street,
+        this.address?.city,
+        this.address?.country,
+        this.educationLevel,
+        this.currentInstitution,
+        this.graduationYear,
+        this.lastGpa,
+        this.englishProficiency?.testType && this.englishProficiency.testType !== ENGLISH_TEST.NONE
+    ];
+
+    const filledFields = fields.filter(Boolean).length;
+    return Math.round((filledFields / fields.length) * 100);
+};
+
+/**
+ * Soft delete profile
+ * @returns {Promise<StudentProfile>}
+ */
+studentProfileSchema.methods.softDelete = function () {
+    this.deletedAt = new Date();
+    return this.save();
+};
+
+/**
+ * Restore soft deleted profile
+ * @returns {Promise<StudentProfile>}
+ */
+studentProfileSchema.methods.restore = function () {
+    this.deletedAt = null;
+    return this.save();
+};
+
+// ============================================
+// STATIC METHODS
+// ============================================
+
+/**
+ * Find profile by user ID
+ * @param {ObjectId} userId
+ * @returns {Promise<StudentProfile>}
+ */
+studentProfileSchema.statics.findByUserId = function (userId) {
+    return this.findOne({ userId }).populate('user');
+};
+
+/**
+ * Find by passport number
+ * @param {string} passportNumber
+ * @returns {Promise<StudentProfile>}
+ */
+studentProfileSchema.statics.findByPassport = function (passportNumber) {
+    return this.findOne({ passportNumber: passportNumber.toUpperCase() }).populate('user');
+};
+
+/**
+ * Find profiles with expiring passports
+ * @param {number} months - Months until expiry
+ * @returns {Promise<StudentProfile[]>}
+ */
+studentProfileSchema.statics.findExpiringPassports = function (months = 6) {
+    const futureDate = new Date();
+    futureDate.setMonth(futureDate.getMonth() + months);
+
+    return this.find({
+        passportExpiry: {
+            $lte: futureDate,
+            $gt: new Date()
+        }
+    }).populate('user');
+};
+
+/**
+ * Find profiles by nationality
+ * @param {string} nationality
+ * @returns {Promise<StudentProfile[]>}
+ */
+studentProfileSchema.statics.findByNationality = function (nationality) {
+    return this.find({ nationality }).populate('user');
+};
+
+/**
+ * Create or update profile for user
+ * @param {ObjectId} userId
+ * @param {Object} profileData
+ * @returns {Promise<StudentProfile>}
+ */
+studentProfileSchema.statics.createOrUpdate = async function (userId, profileData) {
+    const existing = await this.findOne({ userId });
+
+    if (existing) {
+        Object.assign(existing, profileData);
+        return existing.save();
+    }
+
+    return this.create({ userId, ...profileData });
+};
+
+// ============================================
+// JSON TRANSFORM
+// ============================================
+studentProfileSchema.set('toJSON', {
+    virtuals: true,
+    transform: function (doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+    }
+});
+
+studentProfileSchema.set('toObject', { virtuals: true });
+
+// ============================================
+// EXPORT
+// ============================================
+const StudentProfile = model('StudentProfile', studentProfileSchema);
+export default StudentProfile;

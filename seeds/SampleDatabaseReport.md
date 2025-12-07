@@ -1,6 +1,6 @@
 # Sample Database Seed Report
 
-**Generated**: 2025-12-07T23:27:13.946Z
+**Generated**: 2025-12-07T23:45:55.582Z
 
 ---
 
@@ -90,10 +90,10 @@
 
 | Application | Type | Name | File Path | Status | Uploaded By |
 |-------------|------|------|-----------|--------|-------------|
-| System Administrator | PASSPORT | Passport Copy | uploads/sample/passport.pdf | VERIFIED | System Administrator |
+| System Administrator | PASSPORT | Passport Copy | uploads/sample/passport.jpg | VERIFIED | System Administrator |
 | System Administrator | ACADEMIC_TRANSCRIPT | Bachelor Degree Transcript | uploads/sample/transcript.pdf | UPLOADED | System Administrator |
 | System Administrator | ENGLISH_TEST | IELTS Results | N/A | PENDING | N/A |
-| John Manager | PASSPORT | Passport Copy | uploads/sample/passport.pdf | VERIFIED | John Manager |
+| John Manager | PASSPORT | Passport Copy | uploads/sample/passport.jpg | VERIFIED | John Manager |
 | John Manager | STATEMENT_OF_PURPOSE | Statement of Purpose | uploads/sample/sop.pdf | VERIFIED | John Manager |
 | John Manager | CV_RESUME | Curriculum Vitae | uploads/sample/cv.pdf | REJECTED | John Manager |
 
@@ -101,7 +101,7 @@
 
 Place the following files in `uploads/sample/` directory:
 
-- `passport.pdf` - Sample passport document (used by multiple students)
+- `passport.jpg` - Sample passport document (used by multiple students)
 - `transcript.pdf` - Sample academic transcript
 - `sop.pdf` - Sample statement of purpose
 - `cv.pdf` - Sample curriculum vitae

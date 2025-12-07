@@ -1,0 +1,202 @@
+// routes/onboarding/onboarding.mjs
+import express from 'express';
+import User from '../../models/Users/_UsersMain.mjs';
+import { attachUser, requireEmailVerified, requirePasswordSet, requirePhoneVerified } from '../../middlewares/auth.mjs';
+import { generateToken } from '../../middlewares/jwt.mjs';
+
+const router = express.Router();
+
+/**
+ * POST /api/onboarding/basic-info
+ * Submit basic information after phone verification
+ */
+router.post('/basic-info', attachUser, requireEmailVerified, requirePasswordSet, requirePhoneVerified, async (req, res) => {
+    try {
+        const { firstName, lastName, dateOfBirth, gender } = req.body;
+
+        const user = req.user;
+
+        // Check if basic info already set
+        if (user.firstName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Basic information already set. Use update endpoint to modify.',
+                code: 'BASIC_INFO_ALREADY_SET'
+            });
+        }
+
+        // Validate required fields
+        if (!firstName || !lastName) {
+            return res.status(400).json({
+                success: false,
+                message: 'First name and last name are required'
+            });
+        }
+
+        // Update user
+        user.firstName = firstName;
+        user.lastName = lastName;
+        if (dateOfBirth) user.dateOfBirth = dateOfBirth;
+        if (gender) user.gender = gender;
+
+        await user.save();
+
+        // Generate new token with updated info
+        const token = generateToken({
+            userId: user._id,
+            email: user.email,
+            role: user.role
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Basic information saved successfully',
+            data: {
+                user: {
+                    id: user._id,
+                    email: user.email,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    dateOfBirth: user.dateOfBirth,
+                    gender: user.gender,
+                    role: user.role,
+                    emailVerified: user.emailVerified,
+                    phoneVerified: user.phoneVerified
+                },
+                token
+            }
+        });
+
+    } catch (error) {
+        console.error('Submit basic info error:', error);
+
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(err => err.message);
+            return res.status(400).json({
+                success: false,
+                message: messages.join(', ')
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to save basic information',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * PUT /api/onboarding/basic-info
+ * Update basic information
+ */
+router.put('/basic-info', attachUser, async (req, res) => {
+    try {
+        const { firstName, lastName, dateOfBirth, gender } = req.body;
+
+        const user = req.user;
+
+        // Update fields if provided
+        if (firstName) user.firstName = firstName;
+        if (lastName) user.lastName = lastName;
+        if (dateOfBirth !== undefined) user.dateOfBirth = dateOfBirth;
+        if (gender !== undefined) user.gender = gender;
+
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: 'Basic information updated successfully',
+            data: {
+                user: {
+                    id: user._id,
+                    email: user.email,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    dateOfBirth: user.dateOfBirth,
+                    gender: user.gender,
+                    role: user.role
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Update basic info error:', error);
+
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(err => err.message);
+            return res.status(400).json({
+                success: false,
+                message: messages.join(', ')
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to update basic information',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/onboarding/status
+ * Get onboarding status
+ */
+router.get('/status', attachUser, async (req, res) => {
+    try {
+        const user = req.user;
+
+        const status = {
+            emailVerified: user.emailVerified,
+            passwordSet: !!user.password,
+            phoneNumberSet: !!user.phoneNumber,
+            phoneVerified: user.phoneVerified,
+            basicInfoSet: !!(user.firstName && user.lastName),
+            onboardingComplete: !!(
+                user.emailVerified &&
+                user.password &&
+                user.phoneVerified &&
+                user.firstName &&
+                user.lastName
+            )
+        };
+
+        // Determine current step
+        let currentStep = 'complete';
+        if (!status.emailVerified) {
+            currentStep = 'email-verification';
+        } else if (!status.passwordSet) {
+            currentStep = 'set-password';
+        } else if (!status.phoneVerified) {
+            currentStep = 'phone-verification';
+        } else if (!status.basicInfoSet) {
+            currentStep = 'basic-info';
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                ...status,
+                currentStep,
+                user: {
+                    email: user.email,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    phoneNumber: user.phoneNumber,
+                    role: user.role
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Get onboarding status error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to get onboarding status',
+            error: error.message
+        });
+    }
+});
+
+export default router;

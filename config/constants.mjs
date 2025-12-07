@@ -12,3 +12,4 @@ export const GRAY = "\u001b[90m";
 export const X = "\u001b[31m ✗ \u001b[0m";
 export const T = "\u001b[32m ✓ \u001b[0m";
 export const P = "\u001b[34m .. \u001b[0m";
+export const E = "\u001b[33m !! \u001b[0m";

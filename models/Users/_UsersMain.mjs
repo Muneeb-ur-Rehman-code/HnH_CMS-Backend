@@ -32,7 +32,7 @@ const OTP_CONFIG = {
     LENGTH: 6,
     EXPIRY_MINUTES: 10,
     MAX_ATTEMPTS: 5,
-    COOLDOWN_MINUTES: 20
+    COOLDOWN_MINUTES: 1
 };
 
 const PASSWORD_CONFIG = {
@@ -477,7 +477,8 @@ userSchema.methods.generateEmailOtp = async function () {
     };
 
     await this.save();
-    return { user: this, otp: code };
+
+    return { user: this, success: true, otp: code };
 };
 
 /**

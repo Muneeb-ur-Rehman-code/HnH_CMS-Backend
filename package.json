@@ -18,7 +18,7 @@
         "fs": "^0.0.1-security",
         "mongoose": "^9.0.1",
         "multer": "^2.0.2",
-        "nodemailer": "^7.0.11",
+        "node-mailjet": "^6.0.11",
         "path": "^0.12.7",
         "url": "^0.11.4"
     },

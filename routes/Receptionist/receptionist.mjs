@@ -8,12 +8,8 @@ import { INITIAL_SOURCE, INITIAL_STATUS } from '../../models/initial/Initial.mjs
 
 const router = express.Router();
 
-/**
- * POST /api/receptionist/walk-in
- * Create a walk-in student entry
- * Requires: Receptionist role
- */
-router.post('/walk-in', attachUser, requireRole(USER_ROLE.RECEPTIONIST, USER_ROLE.MANAGER, USER_ROLE.ADMIN), async (req, res) => {
+// POST /api/receptionist/walk-in
+router.post('/walk-in', attachUser, requireRole(USER_ROLE.RECEPTIONIST, USER_ROLE.ADMIN), async (req, res) => {
     try {
         const {
             email,
@@ -130,44 +126,6 @@ router.post('/walk-in', attachUser, requireRole(USER_ROLE.RECEPTIONIST, USER_ROL
         return res.status(500).json({
             success: false,
             message: 'Failed to register walk-in student',
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/receptionist/today-walk-ins
- * Get today's walk-in entries
- */
-router.get('/today-walk-ins', attachUser, requireRole(USER_ROLE.RECEPTIONIST, USER_ROLE.MANAGER, USER_ROLE.ADMIN), async (req, res) => {
-    try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        const walkIns = await Initial.find({
-            source: INITIAL_SOURCE.WALK_IN,
-            createdAt: {
-                $gte: today,
-                $lt: tomorrow
-            }
-        }).sort({ createdAt: -1 });
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                count: walkIns.length,
-                walkIns
-            }
-        });
-
-    } catch (error) {
-        console.error('Get today walk-ins error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch walk-ins',
             error: error.message
         });
     }

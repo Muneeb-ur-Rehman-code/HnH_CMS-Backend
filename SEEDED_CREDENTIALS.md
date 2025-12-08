@@ -25,7 +25,7 @@ This will:
 | Property | Value |
 |----------|-------|
 | **Password** | `TestPassword123!` |
-| **Phone Number** | `+923001234567` |
+| **Phone Number** | `923001234567` |
 | **Email** | Verified ✓ |
 | **Phone** | Verified ✓ |
 | **Status** | ACTIVE |
@@ -37,38 +37,38 @@ This will:
 ### Admin Users
 | Email | Name | Password |
 |-------|------|----------|
-| admin1@visaconsult.com | Admin1 User | TestPassword123! |
-| admin2@visaconsult.com | Admin2 User | TestPassword123! |
+| admin1@visaconsult.com | Adminst User | TestPassword123! |
+| admin2@visaconsult.com | Adminnd User | TestPassword123! |
 
 ### Manager Users
 | Email | Name | Password |
 |-------|------|----------|
-| manager1@visaconsult.com | Manager1 User | TestPassword123! |
-| manager2@visaconsult.com | Manager2 User | TestPassword123! |
+| manager1@visaconsult.com | Managerst User | TestPassword123! |
+| manager2@visaconsult.com | Managernd User | TestPassword123! |
 
 ### Consultant Users
 | Email | Name | Password |
 |-------|------|----------|
-| consultant1@visaconsult.com | Consultant1 User | TestPassword123! |
-| consultant2@visaconsult.com | Consultant2 User | TestPassword123! |
+| consultant1@visaconsult.com | Consultantst User | TestPassword123! |
+| consultant2@visaconsult.com | Consultantnd User | TestPassword123! |
 
 ### Accountant Users
 | Email | Name | Password |
 |-------|------|----------|
-| accountant1@visaconsult.com | Accountant1 User | TestPassword123! |
-| accountant2@visaconsult.com | Accountant2 User | TestPassword123! |
+| accountant1@visaconsult.com | Accountantst User | TestPassword123! |
+| accountant2@visaconsult.com | Accountantnd User | TestPassword123! |
 
 ### Agent Users
 | Email | Name | Password |
 |-------|------|----------|
-| agent1@visaconsult.com | Agent1 User | TestPassword123! |
-| agent2@visaconsult.com | Agent2 User | TestPassword123! |
+| agent1@visaconsult.com | Agentst User | TestPassword123! |
+| agent2@visaconsult.com | Agentnd User | TestPassword123! |
 
 ### Receptionist Users
 | Email | Name | Password |
 |-------|------|----------|
-| receptionist1@visaconsult.com | Receptionist1 User | TestPassword123! |
-| receptionist2@visaconsult.com | Receptionist2 User | TestPassword123! |
+| receptionist1@visaconsult.com | Receptionistst User | TestPassword123! |
+| receptionist2@visaconsult.com | Receptionistnd User | TestPassword123! |
 
 ---
 
@@ -76,8 +76,8 @@ This will:
 
 | Email | Name | Password | Nationality | Education |
 |-------|------|----------|-------------|-----------|
-| student1@email.com | Student1 User | TestPassword123! | Pakistani | Bachelors |
-| student2@email.com | Student2 User | TestPassword123! | Pakistani | Bachelors |
+| student1@email.com | Studentst User | TestPassword123! | Pakistani | Bachelors |
+| student2@email.com | Studentnd User | TestPassword123! | Pakistani | Bachelors |
 
 ### Student Details
 - **Address**: 123 University Road, Lahore, Punjab, Pakistan 54000
@@ -85,51 +85,6 @@ This will:
 - **GPA**: 3.7/4.0
 - **English Test**: IELTS - 7.5
 - **Passport**: Valid until 2032-01-01
-
----
-
-## Related Data
-
-### Applications
-- **Student**: Student1 User
-- **Consultant**: Consultant1 User
-- **Target**: MSc Artificial Intelligence at Imperial College London, United Kingdom
-- **Budget**: £40,000 GBP
-- **Status**: INVOICE_PENDING
-
-### Invoice
-- **Amount**: £2,500 GBP
-- **Accountant**: Accountant1 User
-- **Status**: PENDING
-- **Due**: 10 days from seeding date
-- **Breakdown**:
-  - Consultation Fee: £1,500
-  - Application Processing: £1,000
-
-### Tasks (2 total)
-1. **Finalize Statement of Purpose**
-   - Status: IN_PROGRESS
-   - Priority: HIGH
-   - Assigned to: Student1 User
-   - Created by: Consultant1 User
-   - Visible to Student: YES
-
-2. **Verify Financial Documents**
-   - Status: PENDING
-   - Priority: MEDIUM
-   - Assigned to: Consultant1 User
-   - Created by: Consultant1 User
-   - Visible to Student: NO
-
-### Documents (2 total)
-1. **Passport Scan** (VERIFIED)
-   - Type: PASSPORT
-   - Uploaded by: Student1 User
-   - Verified by: Consultant1 User
-
-2. **Bachelors Transcript** (UPLOADED)
-   - Type: ACADEMIC_TRANSCRIPT
-   - Uploaded by: Student1 User
 
 ---
 

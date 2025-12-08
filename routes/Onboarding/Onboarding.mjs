@@ -1,22 +1,19 @@
 // routes/onboarding/onboarding.mjs
 import express from 'express';
 import User from '../../models/Users/_UsersMain.mjs';
-import { attachUser, requireEmailVerified, requirePasswordSet, requirePhoneVerified } from '../../middlewares/Auth.mjs';
+import { attachUser, requireAuth, requireEmailVerified, requirePasswordSet, requirePhoneVerified } from '../../middlewares/Auth.mjs';
 import { generateToken } from '../../middlewares/jwt.mjs';
 
 const router = express.Router();
 
-/**
- * POST /api/onboarding/basic-info
- * Submit basic information after phone verification
- */
-router.post('/basic-info', attachUser, requireEmailVerified, requirePasswordSet, requirePhoneVerified, async (req, res) => {
+
+// /api/onboarding/basic-info
+router.post('/basic-info', attachUser, requireAuth, requireEmailVerified, requirePasswordSet, requirePhoneVerified, async (req, res) => {
     try {
         const { firstName, lastName, dateOfBirth, gender } = req.body;
 
         const user = req.user;
 
-        // Check if basic info already set
         if (user.firstName) {
             return res.status(400).json({
                 success: false,
@@ -33,10 +30,23 @@ router.post('/basic-info', attachUser, requireEmailVerified, requirePasswordSet,
             });
         }
 
-        // Update user
+        // Update user (use `dob` field from schema)
         user.firstName = firstName;
         user.lastName = lastName;
-        if (dateOfBirth) user.dateOfBirth = dateOfBirth;
+        if (dateOfBirth !== undefined) {
+            if (dateOfBirth === null) {
+                user.dob = null;
+            } else {
+                const parsedDob = new Date(dateOfBirth);
+                if (isNaN(parsedDob.getTime())) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Invalid dateOfBirth format'
+                    });
+                }
+                user.dob = parsedDob;
+            }
+        }
         if (gender) user.gender = gender;
 
         await user.save();
@@ -57,7 +67,7 @@ router.post('/basic-info', attachUser, requireEmailVerified, requirePasswordSet,
                     email: user.email,
                     firstName: user.firstName,
                     lastName: user.lastName,
-                    dateOfBirth: user.dateOfBirth,
+                    dateOfBirth: user.dob,
                     gender: user.gender,
                     role: user.role,
                     emailVerified: await user.isEmailVerifiedAsync(),
@@ -86,20 +96,36 @@ router.post('/basic-info', attachUser, requireEmailVerified, requirePasswordSet,
     }
 });
 
-/**
- * PUT /api/onboarding/basic-info
- * Update basic information
- */
-router.put('/basic-info', attachUser, async (req, res) => {
+// PUT /api/onboarding/basic-info
+router.put('/basic-info', attachUser, requireAuth, requireEmailVerified, requirePasswordSet, requirePhoneVerified, async (req, res) => {
     try {
-        const { firstName, lastName, dateOfBirth, gender } = req.body;
-
         const user = req.user;
+        // Ensure that the basic info has been set via POST at least once
+        if (!user.firstName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please set your basic information first using the POST endpoint.',
+                code: 'BASIC_INFO_NOT_SET'
+            });
+        }
+        const { firstName, lastName, dateOfBirth, gender } = req.body || {};
 
-        // Update fields if provided
         if (firstName) user.firstName = firstName;
         if (lastName) user.lastName = lastName;
-        if (dateOfBirth !== undefined) user.dateOfBirth = dateOfBirth;
+        if (dateOfBirth !== undefined) {
+            if (dateOfBirth === null) {
+                user.dob = null;
+            } else {
+                const parsedDob = new Date(dateOfBirth);
+                if (isNaN(parsedDob.getTime())) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Invalid dateOfBirth format'
+                    });
+                }
+                user.dob = parsedDob;
+            }
+        }
         if (gender !== undefined) user.gender = gender;
 
         await user.save();
@@ -113,7 +139,7 @@ router.put('/basic-info', attachUser, async (req, res) => {
                     email: user.email,
                     firstName: user.firstName,
                     lastName: user.lastName,
-                    dateOfBirth: user.dateOfBirth,
+                    dateOfBirth: user.dob,
                     gender: user.gender,
                     role: user.role
                 }
@@ -139,10 +165,7 @@ router.put('/basic-info', attachUser, async (req, res) => {
     }
 });
 
-/**
- * GET /api/onboarding/status
- * Get onboarding status
- */
+// GET /api/onboarding/status
 router.get('/status', attachUser, async (req, res) => {
     try {
         const user = req.user;
@@ -150,17 +173,16 @@ router.get('/status', attachUser, async (req, res) => {
         const status = {
             emailVerified: await user.isEmailVerifiedAsync(),
             passwordSet: await user.hasPasswordAsync(),
-            phoneNumberSet: !!(user.phoneNumber || user.phone?.number),
+            phoneNumberSet: !!(user.phone?.number),
             phoneVerified: await user.isPhoneVerifiedAsync(),
-            basicInfoSet: !!(user.firstName && user.lastName)
+            basicInfoSet: !!(user.firstName)
         };
 
         status.onboardingComplete = !!(
             status.emailVerified &&
             status.passwordSet &&
             status.phoneVerified &&
-            user.firstName &&
-            user.lastName
+            user.firstName
         );
 
         // Determine current step
@@ -184,7 +206,7 @@ router.get('/status', attachUser, async (req, res) => {
                     email: user.email,
                     firstName: user.firstName,
                     lastName: user.lastName,
-                    phoneNumber: user.phoneNumber,
+                    phoneNumber: user.phone?.number,
                     role: user.role
                 }
             }

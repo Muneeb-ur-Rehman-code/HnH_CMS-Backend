@@ -273,7 +273,7 @@ userSchema.virtual('isDeleted').get(function () {
 });
 
 userSchema.virtual('isProfileComplete').get(function () {
-    return !!(this.firstName && this.lastName && this.dob && this.gender);
+    return !!(this.firstName);
 });
 
 userSchema.virtual('studentProfile', {
@@ -673,7 +673,7 @@ userSchema.methods.getFullNameAsync = async function () {
 
 userSchema.methods.isProfileCompleteAsync = async function () {
     const user = await this.constructor.findById(this._id);
-    return !!(user.firstName && user.lastName && user.dob && user.gender);
+    return !!(user.firstName);
 };
 
 userSchema.methods.updateLastLogin = function () {

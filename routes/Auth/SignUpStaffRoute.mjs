@@ -9,14 +9,8 @@ import { generateToken } from '../../middlewares/jwt.mjs';
 
 const router = express.Router();
 
-// ============================================
-// EMAIL VERIFICATION (STAFF)
-// ============================================
 
-/**
- * POST /api/auth/signup-staff/send-email-otp
- * Send OTP to email for staff signup
- */
+// /api/auth/signup-staff/send-email-otp
 router.post('/send-email-otp', async (req, res) => {
     try {
         const { email } = req.body;
@@ -30,12 +24,10 @@ router.post('/send-email-otp', async (req, res) => {
 
         const normalizedEmail = email.toLowerCase().trim();
 
-        // Check if user exists
         let user = await User.findOne({ email: normalizedEmail });
 
-        // If user exists and has password, they should login
-            if (user) {
-                if (await user.hasPasswordAsync()) {
+        if (user) {
+            if (await user.hasPasswordAsync()) {
                 return res.status(400).json({
                     success: false,
                     message: 'User already exists. Please login.',
@@ -44,7 +36,6 @@ router.post('/send-email-otp', async (req, res) => {
             }
         }
 
-        // If user doesn't exist, create new user with STAFF role
         if (!user) {
             user = await User.create({
                 email: normalizedEmail,
@@ -52,7 +43,6 @@ router.post('/send-email-otp', async (req, res) => {
                 source: USER_SOURCE.ONLINE
             });
         } else {
-            // Update existing user to staff if they don't have password
             const hasPasswordExisting = await user.hasPasswordAsync();
             if (!hasPasswordExisting && user.role === USER_ROLE.STUDENT) {
                 user.role = USER_ROLE.STAFF;
@@ -60,7 +50,6 @@ router.post('/send-email-otp', async (req, res) => {
             }
         }
 
-        // Send OTP
         const result = await user.generateEmailOtp();
 
         if (!result.success) {
@@ -71,7 +60,6 @@ router.post('/send-email-otp', async (req, res) => {
             });
         }
 
-        // Send email
         await sendOTPEmail(normalizedEmail, result.otp);
 
         return res.status(200).json({
@@ -93,10 +81,7 @@ router.post('/send-email-otp', async (req, res) => {
     }
 });
 
-/**
- * POST /api/auth/signup-staff/verify-email-otp
- * Verify email OTP and create unverified staff profile
- */
+// /api/auth/signup-staff/verify-email-otp
 router.post('/verify-email-otp', async (req, res) => {
     try {
         const { email, otp, staffRole } = req.body;
@@ -115,7 +100,6 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
-        // Validate staff role
         const validStaffRoles = Object.values(STAFF_ROLE);
         if (!validStaffRoles.includes(staffRole)) {
             return res.status(400).json({
@@ -135,7 +119,6 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
-        // Verify OTP
         const result = await user.verifyEmailOtp(otp);
 
         if (!result.success) {
@@ -145,7 +128,6 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
-        // Create or update staff profile
         let staffProfile = await StaffProfile.findOne({ userId: user._id });
 
         if (!staffProfile) {
@@ -160,7 +142,6 @@ router.post('/verify-email-otp', async (req, res) => {
             await staffProfile.save();
         }
 
-        // Generate short-lived action token for setting password (same as general signup flow)
         const token = generateToken({ userId: user._id.toString(), purpose: 'set_password' }, { expiresIn: '15m' });
 
         return res.status(200).json({
@@ -194,10 +175,7 @@ router.post('/verify-email-otp', async (req, res) => {
     }
 });
 
-/**
- * POST /api/auth/signup-staff/resend-email-otp
- * Resend email OTP for staff
- */
+// /api/auth/signup-staff/resend-email-otp
 router.post('/resend-email-otp', async (req, res) => {
     try {
         const { email } = req.body;
@@ -220,15 +198,13 @@ router.post('/resend-email-otp', async (req, res) => {
             });
         }
 
-        // Check if already verified
-        if (user.emailVerified) {
+        if (await user.isEmailVerifiedAsync()) {
             return res.status(400).json({
                 success: false,
                 message: 'Email already verified'
             });
         }
 
-        // Send OTP
         const result = await user.sendEmailOTP();
 
         if (!result.success) {
@@ -239,7 +215,6 @@ router.post('/resend-email-otp', async (req, res) => {
             });
         }
 
-        // Send email
         await sendOTPEmail(normalizedEmail, result.otp);
 
         return res.status(200).json({
@@ -257,14 +232,7 @@ router.post('/resend-email-otp', async (req, res) => {
     }
 });
 
-// ============================================
-// STATUS CHECK
-// ============================================
-
-/**
- * GET /api/auth/signup-staff/status
- * Get staff signup status
- */
+// /api/auth/signup-staff/status
 router.get('/status', async (req, res) => {
     try {
         const { email } = req.query;
@@ -290,10 +258,8 @@ router.get('/status', async (req, res) => {
             });
         }
 
-        // Use model helper to get fresh registration status (includes hidden fields)
         const reg = await user.getRegistrationStatus();
 
-        // Get staff profile
         const staffProfile = await StaffProfile.findOne({ userId: user._id });
 
         if (reg.hasPassword) {

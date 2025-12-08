@@ -32,7 +32,7 @@ const OTP_CONFIG = {
     LENGTH: 6,
     EXPIRY_MINUTES: 10,
     MAX_ATTEMPTS: 5,
-    COOLDOWN_MINUTES: 1
+    COOLDOWN_MINUTES: 2
 };
 
 const PASSWORD_CONFIG = {
@@ -101,7 +101,6 @@ const phoneSchema = new Schema(
 // ============================================
 const userSchema = new Schema(
     {
-        // ---- Core Fields ----
         email: {
             type: String,
             required: [true, 'Email is required'],
@@ -123,20 +122,17 @@ const userSchema = new Schema(
             select: false
         },
 
-        // ---- Email Verification ----
         emailOtp: {
             type: otpSchema,
             default: () => ({}),
             select: false
         },
 
-        // ---- Phone ----
         phone: {
             type: phoneSchema,
             default: () => ({})
         },
 
-        // ---- Profile Info ----
         firstName: {
             type: String,
             trim: true,
@@ -191,7 +187,6 @@ const userSchema = new Schema(
             default: null
         },
 
-        // ---- Role & Source ----
         role: {
             type: String,
             enum: {
@@ -211,7 +206,6 @@ const userSchema = new Schema(
             default: USER_SOURCE.ONLINE
         },
 
-        // ---- Status ----
         status: {
             type: String,
             enum: {
@@ -222,13 +216,11 @@ const userSchema = new Schema(
             index: true
         },
 
-        // ---- Activity Tracking ----
         lastLoginAt: {
             type: Date,
             default: null
         },
 
-        // ---- Soft Delete ----
         deletedAt: {
             type: Date,
             default: null,
@@ -240,9 +232,6 @@ const userSchema = new Schema(
     }
 );
 
-// ============================================
-// INDEXES
-// ============================================
 userSchema.index({ email: 1, deletedAt: 1 });
 userSchema.index({ role: 1, status: 1 });
 userSchema.index({ createdAt: -1 });
@@ -256,6 +245,7 @@ userSchema.pre(/^find/, function () {
     }
     // next();
 });
+
 
 // ============================================
 // VIRTUALS
@@ -275,7 +265,6 @@ userSchema.virtual('isPhoneVerified').get(function () {
 });
 
 userSchema.virtual('hasPassword').get(function () {
-    // Treat missing or falsy password as not set
     return !!this.password;
 });
 
@@ -301,15 +290,12 @@ userSchema.virtual('staffProfile', {
     justOne: true
 });
 
+
+
 // ============================================
 // STATIC METHODS - Password Utilities
 // ============================================
 
-/**
- * Validate password strength
- * @param {string} password - Password to validate
- * @returns {Object} - { isValid: boolean, errors: string[] }
- */
 userSchema.statics.validatePasswordStrength = function (password) {
     const errors = [];
 
@@ -335,19 +321,10 @@ userSchema.statics.validatePasswordStrength = function (password) {
     };
 };
 
-/**
- * Hash a password
- * @param {string} password - Plain text password
- * @returns {Promise<string>} - Hashed password
- */
 userSchema.statics.hashPassword = async function (password) {
     return bcrypt.hash(password, PASSWORD_CONFIG.SALT_ROUNDS);
 };
 
-/**
- * Generate OTP
- * @returns {Object} - { code: string, hashedCode: string, expiresAt: Date }
- */
 userSchema.statics.generateOtp = function () {
     const code = crypto.randomInt(100000, 999999).toString();
     const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
@@ -356,29 +333,14 @@ userSchema.statics.generateOtp = function () {
     return { code, hashedCode, expiresAt };
 };
 
-/**
- * Hash OTP code
- * @param {string} code - OTP code
- * @returns {string} - Hashed OTP
- */
 userSchema.statics.hashOtp = function (code) {
     return crypto.createHash('sha256').update(code).digest('hex');
 };
 
-/**
- * Find user by email with sensitive fields
- * @param {string} email
- * @returns {Promise<User>}
- */
 userSchema.statics.findByEmailWithSensitive = function (email) {
     return this.findOne({ email: email.toLowerCase() }).select('+password +emailOtp');
 };
 
-/**
- * Find user by email including soft deleted
- * @param {string} email
- * @returns {Promise<User>}
- */
 userSchema.statics.findByEmailIncludingDeleted = function (email) {
     return this.findOne({ email: email.toLowerCase() }).setOptions({ includeSoftDeleted: true });
 };
@@ -387,11 +349,6 @@ userSchema.statics.findByEmailIncludingDeleted = function (email) {
 // INSTANCE METHODS - Password Operations
 // ============================================
 
-/**
- * Set password for user
- * @param {string} password - Plain text password
- * @returns {Promise<User>}
- */
 userSchema.methods.setPassword = async function (password) {
     const validation = this.constructor.validatePasswordStrength(password);
     if (!validation.isValid) {
@@ -402,11 +359,6 @@ userSchema.methods.setPassword = async function (password) {
     return this.save();
 };
 
-/**
- * Verify password
- * @param {string} password - Plain text password to verify
- * @returns {Promise<boolean>}
- */
 userSchema.methods.verifyPassword = async function (password) {
     // Fetch fresh user with password selected
     const user = await this.constructor.findById(this._id).select('+password');
@@ -416,12 +368,6 @@ userSchema.methods.verifyPassword = async function (password) {
     return bcrypt.compare(password, user.password);
 };
 
-/**
- * Change password (requires old password)
- * @param {string} oldPassword - Current password
- * @param {string} newPassword - New password
- * @returns {Promise<User>}
- */
 userSchema.methods.changePassword = async function (oldPassword, newPassword) {
     const isValid = await this.verifyPassword(oldPassword);
     if (!isValid) {
@@ -433,11 +379,6 @@ userSchema.methods.changePassword = async function (oldPassword, newPassword) {
     return user.setPassword(newPassword);
 };
 
-/**
- * Reset password (via OTP, no old password needed)
- * @param {string} newPassword - New password
- * @returns {Promise<User>}
- */
 userSchema.methods.resetPassword = async function (newPassword) {
     // Fetch fresh user with emailOtp selected
     const user = await this.constructor.findById(this._id).select('+emailOtp');
@@ -452,10 +393,6 @@ userSchema.methods.resetPassword = async function (newPassword) {
 // INSTANCE METHODS - Email OTP Operations
 // ============================================
 
-/**
- * Generate and set email OTP
- * @returns {Promise<{ user: User, otp: string }>}
- */
 userSchema.methods.generateEmailOtp = async function () {
     // Fetch fresh user data with email OTP
     const user = await this.constructor.findById(this._id).select('+emailOtp');
@@ -490,11 +427,6 @@ userSchema.methods.generateEmailOtp = async function () {
     return { user: user, success: true, otp: code };
 };
 
-/**
- * Verify email OTP
- * @param {string} code - OTP code to verify
- * @returns {Promise<User>}
- */
 userSchema.methods.verifyEmailOtp = async function (code) {
     const user = await this.constructor.findById(this._id).select('+emailOtp');
 
@@ -534,10 +466,6 @@ userSchema.methods.verifyEmailOtp = async function (code) {
     return user;
 };
 
-/**
- * Get email OTP cooldown remaining time in seconds
- * @returns {Promise<number>}
- */
 userSchema.methods.getEmailOtpCooldownRemaining = async function () {
     // Fetch fresh user data with email OTP
     const user = await this.constructor.findById(this._id).select('+emailOtp');
@@ -557,11 +485,6 @@ userSchema.methods.getEmailOtpCooldownRemaining = async function () {
 // INSTANCE METHODS - Phone OTP Operations
 // ============================================
 
-/**
- * Set phone number and generate OTP
- * @param {string} phoneNumber - Phone number in format 923001234567
- * @returns {Promise<{ user: User, otp: string }>}
- */
 userSchema.methods.setPhoneAndGenerateOtp = async function (phoneNumber) {
     // Validate format
     if (!/^\+?[1-9]\d{9,14}$/.test(phoneNumber)) {
@@ -603,10 +526,6 @@ userSchema.methods.setPhoneAndGenerateOtp = async function (phoneNumber) {
     return { user: user, success: true, otp: code };
 };
 
-/**
- * Resend phone OTP
- * @returns {Promise<{ user: User, otp: string, success: boolean }>}
- */
 userSchema.methods.resendPhoneOtp = async function () {
     // Fetch fresh user data
     const user = await this.constructor.findById(this._id);
@@ -619,11 +538,6 @@ userSchema.methods.resendPhoneOtp = async function () {
     return { ...result, success: true };
 };
 
-/**
- * Verify phone OTP
- * @param {string} code - OTP code to verify
- * @returns {Promise<{ user: User, success: boolean }>}
- */
 userSchema.methods.verifyPhoneOtp = async function (code) {
     // Fetch fresh user data with phone OTP
     const user = await this.constructor.findById(this._id);
@@ -663,10 +577,6 @@ userSchema.methods.verifyPhoneOtp = async function (code) {
     return { user, success: true };
 };
 
-/**
- * Get phone OTP cooldown remaining time in seconds
- * @returns {Promise<number>}
- */
 userSchema.methods.getPhoneOtpCooldownRemaining = async function () {
     // Fetch fresh user data with phone OTP
     const user = await this.constructor.findById(this._id);
@@ -686,10 +596,6 @@ userSchema.methods.getPhoneOtpCooldownRemaining = async function () {
 // INSTANCE METHODS - Status Operations
 // ============================================
 
-/**
- * Get registration status for frontend flow
- * @returns {Promise<Object>}
- */
 userSchema.methods.getRegistrationStatus = async function () {
     // Fetch fresh user data including hidden fields
     const user = await this.constructor.findById(this._id).select('+password +emailOtp');
@@ -745,110 +651,63 @@ userSchema.methods.getRegistrationStatus = async function () {
 // ASYNC HELPERS (fetch hidden fields when needed)
 // ============================================
 
-/**
- * Check if user has password (fetches password field)
- * @returns {Promise<boolean>}
- */
 userSchema.methods.hasPasswordAsync = async function () {
     const user = await this.constructor.findById(this._id).select('+password');
     return !!user?.password;
 };
 
-/**
- * Check if email is verified (fetches emailOtp)
- * @returns {Promise<boolean>}
- */
 userSchema.methods.isEmailVerifiedAsync = async function () {
     const user = await this.constructor.findById(this._id).select('+emailOtp');
     return user.emailOtp?.verified === true;
 };
 
-/**n * Check if phone is verified (fetches phone otp)
- * @returns {Promise<boolean>}
- */
 userSchema.methods.isPhoneVerifiedAsync = async function () {
     const user = await this.constructor.findById(this._id);
     return user.phone?.otp?.verified === true;
 };
 
-/**
- * Get display name (relies on firstName)
- * @returns {Promise<string|null>}
- */
 userSchema.methods.getFullNameAsync = async function () {
     const user = await this.constructor.findById(this._id);
     return user.firstName || null;
 };
 
-/**
- * Check if profile is complete (fetches profile fields)
- * @returns {Promise<boolean>}
- */
 userSchema.methods.isProfileCompleteAsync = async function () {
     const user = await this.constructor.findById(this._id);
     return !!(user.firstName && user.lastName && user.dob && user.gender);
 };
 
-/**
- * Update last login
- * @returns {Promise<User>}
- */
 userSchema.methods.updateLastLogin = function () {
     this.lastLoginAt = new Date();
     return this.save();
 };
 
-/**
- * Suspend user
- * @returns {Promise<User>}
- */
 userSchema.methods.suspend = function () {
     this.status = USER_STATUS.SUSPENDED;
     return this.save();
 };
 
-/**
- * Activate user
- * @returns {Promise<User>}
- */
 userSchema.methods.activate = function () {
     this.status = USER_STATUS.ACTIVE;
     return this.save();
 };
 
-/**
- * Deactivate user
- * @returns {Promise<User>}
- */
 userSchema.methods.deactivate = function () {
     this.status = USER_STATUS.INACTIVE;
     return this.save();
 };
 
-/**
- * Soft delete user
- * @returns {Promise<User>}
- */
 userSchema.methods.softDelete = function () {
     this.deletedAt = new Date();
     this.status = USER_STATUS.INACTIVE;
     return this.save();
 };
 
-/**
- * Restore soft deleted user
- * @returns {Promise<User>}
- */
 userSchema.methods.restore = function () {
     this.deletedAt = null;
     this.status = USER_STATUS.ACTIVE;
     return this.save();
 };
 
-/**
- * Convert staff to student
- * @returns {Promise<User>}
- */
 userSchema.methods.convertToStudent = function () {
     if (this.role === USER_ROLE.STUDENT) {
         throw new Error('User is already a student');
@@ -860,6 +719,7 @@ userSchema.methods.convertToStudent = function () {
 // ============================================
 // JSON TRANSFORM
 // ============================================
+
 userSchema.set('toJSON', {
     virtuals: true,
     transform: function (doc, ret) {
@@ -876,6 +736,7 @@ userSchema.set('toJSON', {
 });
 
 userSchema.set('toObject', { virtuals: true });
+
 
 // ============================================
 // EXPORT

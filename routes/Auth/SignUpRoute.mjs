@@ -25,14 +25,11 @@ const requireActionToken = (req, res) => {
     }
 };
 
-// ============================================
-// EMAIL VERIFICATION
-// ============================================
 
-/**
- * POST /api/auth/signup/send-email-otp
- * Send OTP to email for signup
- */
+
+
+
+//  /api/auth/signup/send-email-otp
 router.post('/send-email-otp', async (req, res) => {
     try {
         const { email } = req.body;
@@ -111,10 +108,7 @@ router.post('/send-email-otp', async (req, res) => {
     }
 });
 
-/**
- * POST /api/auth/signup/verify-email-otp
- * Verify email OTP
- */
+// /api/auth/signup/verify-email-otp
 router.post('/verify-email-otp', async (req, res) => {
     try {
         const { email, otp } = req.body;
@@ -188,10 +182,7 @@ router.post('/verify-email-otp', async (req, res) => {
     }
 });
 
-/**
- * POST /api/auth/signup/resend-email-otp
- * Resend email OTP
- */
+// /api/auth/signup/resend-email-otp 
 router.post('/resend-email-otp', async (req, res) => {
     try {
         const { email } = req.body;
@@ -261,14 +252,7 @@ router.post('/resend-email-otp', async (req, res) => {
     }
 });
 
-// ============================================
-// PASSWORD SETUP
-// ============================================
-
-/**
- * POST /api/auth/signup/set-password
- * Set password for new user
- */
+// /api/auth/signup/set-password
 router.post('/set-password', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -305,7 +289,7 @@ router.post('/set-password', async (req, res) => {
         }
 
         // Check if password already set
-        if (user.password) {
+        if (await user.hasPasswordAsync()) {
             return res.status(400).json({
                 success: false,
                 message: 'Password already set. Please use login or password reset.',
@@ -319,6 +303,8 @@ router.post('/set-password', async (req, res) => {
 
         // Issue a normal auth token (uses default expiry from env/JWT_EXPIRY)
         const authToken = generateToken({ userId: user._id.toString() });
+
+        user.updateLastLogin();
 
         return res.status(200).json({
             success: true,
@@ -349,14 +335,7 @@ router.post('/set-password', async (req, res) => {
     }
 });
 
-// ============================================
-// PHONE VERIFICATION
-// ============================================
-
-/**
- * POST /api/auth/signup/send-phone-otp
- * Send OTP to phone number
- */
+// /api/auth/signup/send-phone-otp
 router.post('/send-phone-otp', async (req, res) => {
     try {
         const { email, phoneNumber } = req.body;
@@ -450,10 +429,7 @@ router.post('/send-phone-otp', async (req, res) => {
     }
 });
 
-/**
- * POST /api/auth/signup/verify-phone-otp
- * Verify phone OTP
- */
+// /api/auth/signup/verify-phone-otp
 router.post('/verify-phone-otp', async (req, res) => {
     try {
         const { email, otp } = req.body;
@@ -532,10 +508,7 @@ router.post('/verify-phone-otp', async (req, res) => {
     }
 });
 
-/**
- * POST /api/auth/signup/resend-phone-otp
- * Resend phone OTP
- */
+// /api/auth/signup/resend-phone-otp
 router.post('/resend-phone-otp', async (req, res) => {
     try {
         const { email } = req.body;
@@ -575,7 +548,7 @@ router.post('/resend-phone-otp', async (req, res) => {
         }
 
         // Send OTP
-        const result = await user.sendPhoneOTP();
+        const result = await user.resendPhoneOtp();
 
         if (!result.success) {
             return res.status(400).json({
@@ -613,14 +586,7 @@ router.post('/resend-phone-otp', async (req, res) => {
     }
 });
 
-// ============================================
-// STATUS & COOLDOWN
-// ============================================
-
-/**
- * GET /api/auth/signup/status
- * Get signup status for a user
- */
+// /api/auth/signup/status
 router.get('/status', async (req, res) => {
     try {
         const { email } = req.query;
@@ -682,10 +648,7 @@ router.get('/status', async (req, res) => {
     }
 });
 
-/**
- * GET /api/auth/signup/otp-cooldown
- * Get OTP cooldown times
- */
+// /api/auth/signup/otp-cooldown
 router.get('/otp-cooldown', async (req, res) => {
     try {
         const { email, type } = req.query;

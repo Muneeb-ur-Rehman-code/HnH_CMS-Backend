@@ -48,7 +48,6 @@ const otpSchema = new Schema(
         code: {
             type: String,
             default: null,
-            select: false
         },
         expiresAt: {
             type: Date,
@@ -487,39 +486,42 @@ userSchema.methods.generateEmailOtp = async function () {
  * @returns {Promise<User>}
  */
 userSchema.methods.verifyEmailOtp = async function (code) {
-    if (!this.emailOtp?.code) {
+    const user = await this.constructor.findById(this._id).select('+emailOtp');
+
+    if (!user.emailOtp?.code) {
         throw new Error('No OTP has been generated');
     }
 
     const now = new Date();
 
     // Check if expired
-    if (now > this.emailOtp.expiresAt) {
+    if (now > user.emailOtp.expiresAt) {
         throw new Error('OTP has expired. Please request a new one');
     }
 
     // Check max attempts
-    if (this.emailOtp.attempts >= OTP_CONFIG.MAX_ATTEMPTS) {
+    if (user.emailOtp.attempts >= OTP_CONFIG.MAX_ATTEMPTS) {
         throw new Error('Maximum OTP attempts exceeded. Please request a new OTP');
     }
 
     // Increment attempts
-    this.emailOtp.attempts += 1;
-    this.emailOtp.lastAttemptAt = now;
+    user.emailOtp.attempts += 1;
+    user.emailOtp.lastAttemptAt = now;
 
     const hashedInput = this.constructor.hashOtp(code);
-    if (hashedInput !== this.emailOtp.code) {
-        await this.save();
-        const remainingAttempts = OTP_CONFIG.MAX_ATTEMPTS - this.emailOtp.attempts;
+    if (hashedInput !== user.emailOtp.code) {
+        await user.save();
+        const remainingAttempts = OTP_CONFIG.MAX_ATTEMPTS - user.emailOtp.attempts;
         throw new Error(`Invalid OTP. ${remainingAttempts} attempts remaining`);
     }
 
     // OTP is valid
-    this.emailOtp.verified = true;
-    this.emailOtp.code = null;
+    user.emailOtp.verified = true;
+    user.emailOtp.code = null;
+    user.success = true;
 
-    await this.save();
-    return this;
+    await user.save();
+    return user;
 };
 
 /**

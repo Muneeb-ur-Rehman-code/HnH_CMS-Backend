@@ -107,7 +107,7 @@ router.post('/verify-email-otp', async (req, res) => {
         }
 
         // Verify OTP
-        const result = await user.verifyEmailOTP(otp);
+        const result = await user.verifyEmailOtp(otp);
 
         if (!result.success) {
             return res.status(400).json({

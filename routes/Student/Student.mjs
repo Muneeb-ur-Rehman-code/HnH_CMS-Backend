@@ -7,7 +7,7 @@ import Application from '../../models/Process/Process.mjs';
 import Invoice from '../../models/Invoice/Invoice.mjs';
 import Task from '../../models/Task/Tasks.mjs';
 import Document from '../../models/Docx/Document.mjs';
-import { attachUser, requireRole, requireEmailVerified, requirePhoneVerified, requireBasicInfo } from '../../middlewares/Auth.mjs';
+import { attachUser, requireRole, requireOnboardingComplete } from '../../middlewares/Auth.mjs';
 import { USER_ROLE } from '../../models/Users/_UsersMain.mjs';
 import { INITIAL_SOURCE, INITIAL_STATUS } from '../../models/initial/Initial.mjs';
 
@@ -17,19 +17,10 @@ const router = express.Router();
 const requireStudent = [
     attachUser,
     requireRole(USER_ROLE.STUDENT),
-    requireEmailVerified,
-    requirePhoneVerified,
-    requireBasicInfo
+    requireOnboardingComplete
 ];
 
-// ============================================
-// PROFILE
-// ============================================
-
-/**
- * GET /api/student/profile
- * Get student profile
- */
+// /api/student/profile
 router.get('/profile', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -44,12 +35,22 @@ router.get('/profile', requireStudent, async (req, res) => {
                     id: user._id,
                     email: user.email,
                     firstName: user.firstName,
-                    lastName: user.lastName,
                     phoneNumber: user.phoneNumber,
                     dateOfBirth: user.dateOfBirth,
-                    gender: user.gender
+                    lastName: user.lastName,
+                    phoneNumber: user?.phone.number || null,
+                    dateOfBirth: user.dateOfBirth,
+                    gender: user.gender,
+                    nationality: studentProfile?.nationality || null,
+                    passportNumber: studentProfile?.passportNumber || null,
+                    passportExpiry: studentProfile?.passportExpiry || null,
+                    address: studentProfile?.address || null,
+                    educationLevel: studentProfile?.educationLevel || null,
+                    currentInstitution: studentProfile?.currentInstitution || null,
+                    graduationYear: studentProfile?.graduationYear || null,
+                    lastGPA: studentProfile?.lastGPA || null,
+                    englishProficiency: studentProfile?.englishProficiency || null
                 },
-                profile: studentProfile || null
             }
         });
 
@@ -63,10 +64,7 @@ router.get('/profile', requireStudent, async (req, res) => {
     }
 });
 
-/**
- * PUT /api/student/profile
- * Update student profile
- */
+// /api/student/profile
 router.put('/profile', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -150,14 +148,8 @@ router.put('/profile', requireStudent, async (req, res) => {
     }
 });
 
-// ============================================
-// INITIALS (Application Requests)
-// ============================================
 
-/**
- * GET /api/student/initials
- * Get approved initials for this student
- */
+///api/student/initials
 router.get('/initials', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -186,10 +178,8 @@ router.get('/initials', requireStudent, async (req, res) => {
     }
 });
 
-/**
- * POST /api/student/application-request
- * Create or replace application request
- */
+
+// /api/student/application-request
 router.post('/application-request', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -248,10 +238,7 @@ router.post('/application-request', requireStudent, async (req, res) => {
     }
 });
 
-/**
- * DELETE /api/student/application-request
- * Delete pending application request
- */
+// DELETE /api/student/application-request
 router.delete('/application-request', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -286,14 +273,7 @@ router.delete('/application-request', requireStudent, async (req, res) => {
     }
 });
 
-// ============================================
-// APPLICATIONS
-// ============================================
-
-/**
- * GET /api/student/applications
- * Get all applications for this student
- */
+// /api/student/applications
 router.get('/applications', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -337,10 +317,7 @@ router.get('/applications', requireStudent, async (req, res) => {
     }
 });
 
-/**
- * GET /api/student/applications/:applicationId
- * Get specific application details
- */
+// /api/student/applications/:applicationId
 router.get('/applications/:applicationId', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -392,10 +369,7 @@ router.get('/applications/:applicationId', requireStudent, async (req, res) => {
     }
 });
 
-/**
- * GET /api/student/applications/:applicationId/invoices
- * Get invoices for an application
- */
+// /api/student/applications/:applicationId/invoices
 router.get('/applications/:applicationId/invoices', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -449,10 +423,7 @@ router.get('/applications/:applicationId/invoices', requireStudent, async (req, 
     }
 });
 
-/**
- * GET /api/student/applications/:applicationId/tasks
- * Get tasks for an application (visible to student only)
- */
+// /api/student/applications/:applicationId/tasks
 router.get('/applications/:applicationId/tasks', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -508,10 +479,7 @@ router.get('/applications/:applicationId/tasks', requireStudent, async (req, res
     }
 });
 
-/**
- * GET /api/student/applications/:applicationId/documents
- * Get documents for an application (visible to student only)
- */
+// /api/student/applications/:applicationId/documents
 router.get('/applications/:applicationId/documents', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -567,10 +535,7 @@ router.get('/applications/:applicationId/documents', requireStudent, async (req,
     }
 });
 
-/**
- * POST /api/student/applications/:applicationId/documents/:documentId/upload
- * Upload a document
- */
+// POST /api/student/applications/:applicationId/documents/:documentId/upload
 router.post('/applications/:applicationId/documents/:documentId/upload', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -635,14 +600,7 @@ router.post('/applications/:applicationId/documents/:documentId/upload', require
     }
 });
 
-// ============================================
-// DASHBOARD SUMMARY
-// ============================================
-
-/**
- * GET /api/student/dashboard
- * Get dashboard summary
- */
+// GET /api/student/dashboard
 router.get('/dashboard', requireStudent, async (req, res) => {
     try {
         const user = req.user;

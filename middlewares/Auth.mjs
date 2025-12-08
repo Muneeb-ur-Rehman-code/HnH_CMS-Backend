@@ -9,9 +9,7 @@ import { STAFF_VERIFICATION_STATUS, STAFF_ROLE } from '../models/Users/StaffProf
 // AUTHENTICATION MIDDLEWARES
 // ============================================
 
-/**
- * Attach user to request (REQUIRED - throws error if not authenticated)
- */
+// Attach user to request (REQUIRED - throws error if not authenticated)
 export const attachUser = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
@@ -73,9 +71,7 @@ export const attachUser = async (req, res, next) => {
     }
 };
 
-/**
- * Optionally attach user if token is present (doesn't throw error)
- */
+// Optionally attach user if token is present (doesn't throw error)
 export const optionalAttachUser = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
@@ -99,9 +95,7 @@ export const optionalAttachUser = async (req, res, next) => {
     }
 };
 
-/**
- * Ensure user is authenticated (use after attachUser or optionalAttachUser)
- */
+//Ensure user is authenticated (use after attachUser or optionalAttachUser)
 export const requireAuth = (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({
@@ -112,14 +106,7 @@ export const requireAuth = (req, res, next) => {
     next();
 };
 
-// ============================================
-// ROLE-BASED AUTHORIZATION
-// ============================================
 
-/**
- * Require specific role(s)
- * @param {...string} roles - Allowed roles
- */
 export const requireRole = (...roles) => {
     return async (req, res, next) => {
         if (!req.user) {
@@ -187,37 +174,20 @@ export const requireRole = (...roles) => {
     };
 };
 
-/**
- * Require student role
- */
+
 export const requireStudent = requireRole(USER_ROLE.STUDENT);
 
-/**
- * Require staff role (any staff)
- */
+
 export const requireStaff = requireRole(
     USER_ROLE.STAFF,
     STAFF_ROLE.MANAGER,
     STAFF_ROLE.ADMIN
 );
 
-/**
- * Require manager role
- */
 export const requireManager = requireRole(STAFF_ROLE.MANAGER, STAFF_ROLE.ADMIN);
 
-/**
- * Require admin role
- */
 export const requireAdmin = requireRole(STAFF_ROLE.ADMIN);
 
-// ============================================
-// VERIFICATION CHECKS
-// ============================================
-
-/**
- * Require email to be verified
- */
 export const requireEmailVerified = async (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({
@@ -241,9 +211,6 @@ export const requireEmailVerified = async (req, res, next) => {
     }
 };
 
-/**
- * Require phone to be verified
- */
 export const requirePhoneVerified = async (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({
@@ -277,9 +244,6 @@ export const requirePhoneVerified = async (req, res, next) => {
     }
 };
 
-/**
- * Require password to be set
- */
 export const requirePasswordSet = async (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({
@@ -303,9 +267,6 @@ export const requirePasswordSet = async (req, res, next) => {
     }
 };
 
-/**
- * Require basic profile info (firstName, lastName, etc.)
- */
 export const requireBasicInfo = (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({
@@ -325,19 +286,13 @@ export const requireBasicInfo = (req, res, next) => {
     next();
 };
 
-/**
- * Require full onboarding completion
- */
 export const requireOnboardingComplete = [
     requireEmailVerified,
     requirePasswordSet,
-    requirePhoneVerified,
+    // requirePhoneVerified,
     requireBasicInfo
 ];
 
-/**
- * Require staff verification (for staff members)
- */
 export const requireStaffVerified = async (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({
@@ -382,13 +337,6 @@ export const requireStaffVerified = async (req, res, next) => {
     }
 };
 
-// ============================================
-// ACCOUNT STATUS CHECKS
-// ============================================
-
-/**
- * Check if account is active
- */
 export const requireActiveAccount = (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({
@@ -408,9 +356,6 @@ export const requireActiveAccount = (req, res, next) => {
     next();
 };
 
-/**
- * Ensure user is not deleted
- */
 export const requireNotDeleted = (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({
@@ -430,13 +375,6 @@ export const requireNotDeleted = (req, res, next) => {
     next();
 };
 
-// ============================================
-// COMBINED MIDDLEWARES
-// ============================================
-
-/**
- * Full authentication + verification check
- */
 export const requireFullAuth = [
     attachUser,
     requireActiveAccount,
@@ -445,14 +383,12 @@ export const requireFullAuth = [
     requirePasswordSet
 ];
 
-/**
- * Staff authentication with verification
- */
 export const requireVerifiedStaff = [
     attachUser,
     requireStaff,
     requireStaffVerified
 ];
+
 
 // ============================================
 // EXPORT ALL

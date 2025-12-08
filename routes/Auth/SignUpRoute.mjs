@@ -632,7 +632,7 @@ router.get('/status', async (req, res) => {
                 exists: true,
                 hasPassword: reg.hasPassword,
                 emailVerified: reg.isEmailVerified,
-                phoneVerified: reg.isPhoneVerified,
+                // phoneVerified: reg.isPhoneVerified,
                 firstName: reg.firstName ? true : false,
                 currentStep: reg.currentStep
             }

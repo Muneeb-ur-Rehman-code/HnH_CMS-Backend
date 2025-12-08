@@ -40,7 +40,7 @@ router.post('/walk-in', attachUser, requireRole(STAFF_ROLE.RECEPTIONIST, STAFF_R
                 email: normalizedEmail,
                 firstName,
                 lastName,
-                phoneNumber: phoneNumber || null,
+                phone: { number: phoneNumber || null, otp: { verified: true } },
                 role: USER_ROLE.STUDENT,
                 source: USER_SOURCE.WALK_IN,
                 status: USER_STATUS.ACTIVE
@@ -49,7 +49,18 @@ router.post('/walk-in', attachUser, requireRole(STAFF_ROLE.RECEPTIONIST, STAFF_R
             // Update user info if user exists but has minimal info
             if (!user.firstName) user.firstName = firstName;
             if (!user.lastName) user.lastName = lastName;
-            if (phoneNumber && !user.phoneNumber) user.phoneNumber = phoneNumber;
+
+            // Ensure phone number is present and mark OTP verified by default for walk-ins
+            if (phoneNumber) {
+                if (!user.phone || !user.phone.number) {
+                    user.phone = { number: phoneNumber, otp: { verified: true } };
+                } else {
+                    user.phone.number = user.phone.number || phoneNumber;
+                    if (!user.phone.otp) user.phone.otp = { verified: true };
+                    else user.phone.otp.verified = true;
+                }
+            }
+
             if (user.source === USER_SOURCE.ONLINE && !user.password) {
                 user.source = USER_SOURCE.WALK_IN;
             }

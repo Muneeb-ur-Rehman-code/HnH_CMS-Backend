@@ -10,7 +10,7 @@ const router = express.Router();
 
 
 // /api/onboarding/basic-info
-router.post('/basic-info', attachUser, requireAuth, requireEmailVerified, requirePasswordSet, requirePhoneVerified, async (req, res) => {
+router.post('/basic-info', attachUser, requireAuth, requireEmailVerified, requirePasswordSet, async (req, res) => {
     try {
         const { firstName, lastName, dateOfBirth, gender } = req.body;
 
@@ -99,7 +99,7 @@ router.post('/basic-info', attachUser, requireAuth, requireEmailVerified, requir
 });
 
 // PUT /api/onboarding/basic-info
-router.put('/basic-info', attachUser, requireAuth, requireEmailVerified, requirePasswordSet, requirePhoneVerified, async (req, res) => {
+router.put('/basic-info', attachUser, requireAuth, requireEmailVerified, requirePasswordSet, async (req, res) => {
     try {
         const user = req.user;
         // Ensure that the basic info has been set via POST at least once
@@ -175,15 +175,15 @@ router.get('/status', attachUser, async (req, res) => {
         const status = {
             emailVerified: await user.isEmailVerifiedAsync(),
             passwordSet: await user.hasPasswordAsync(),
-            phoneNumberSet: !!(user.phone?.number),
-            phoneVerified: await user.isPhoneVerifiedAsync(),
+            // phoneNumberSet: !!(user.phone?.number),
+            // phoneVerified: await user.isPhoneVerifiedAsync(),
             basicInfoSet: !!(user.firstName)
         };
 
         status.onboardingComplete = !!(
             status.emailVerified &&
             status.passwordSet &&
-            status.phoneVerified &&
+            // status.phoneVerified &&
             user.firstName
         );
 
@@ -193,8 +193,8 @@ router.get('/status', attachUser, async (req, res) => {
             currentStep = 'email-verification';
         } else if (!status.passwordSet) {
             currentStep = 'set-password';
-        } else if (!status.phoneVerified) {
-            currentStep = 'phone-verification';
+            // } else if (!status.phoneVerified) {
+            // currentStep = 'phone-verification';
         } else if (!status.basicInfoSet) {
             currentStep = 'basic-info';
         }

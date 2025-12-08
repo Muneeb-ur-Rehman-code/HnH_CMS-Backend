@@ -602,9 +602,9 @@ userSchema.methods.getRegistrationStatus = async function () {
 
     const hasPasswordSet = !!user.password;
     const isEmailVerified = user.emailOtp?.verified === true;
-    const isPhoneVerified = user.phone?.otp?.verified === true;
-    const hasPhone = user.phone?.number !== null;
-    const isProfileComplete = !!(user.firstName && user.lastName && user.dob && user.gender);
+    // const isPhoneVerified = user.phone?.otp?.verified === true;
+    // const hasPhone = user.phone?.number !== null;
+    const isProfileComplete = !!(user.firstName);
 
     // Determine current step
     let currentStep = 'EMAIL_VERIFICATION';
@@ -616,12 +616,12 @@ userSchema.methods.getRegistrationStatus = async function () {
     } else if (!hasPasswordSet) {
         currentStep = 'SET_PASSWORD';
         message = 'Please set your password';
-    } else if (!hasPhone) {
-        currentStep = 'ADD_PHONE';
-        message = 'Please add your phone number';
-    } else if (!isPhoneVerified) {
-        currentStep = 'PHONE_VERIFICATION';
-        message = 'Please verify your phone number';
+        // } else if (!hasPhone) {
+        // currentStep = 'ADD_PHONE';
+        // message = 'Please add your phone number';
+        // } else if (!isPhoneVerified) {
+        // currentStep = 'PHONE_VERIFICATION';
+        // message = 'Please verify your phone number';
     } else if (!isProfileComplete) {
         currentStep = 'COMPLETE_PROFILE';
         message = 'Please complete your profile';
@@ -635,8 +635,8 @@ userSchema.methods.getRegistrationStatus = async function () {
         isEmailVerified,
         hasPassword: hasPasswordSet,
         hasPhone,
-        phoneNumber: user.phone?.number || null,
-        isPhoneVerified,
+        // phoneNumber: user.phone?.number || null,
+        // isPhoneVerified,
         isProfileComplete,
         firstName: user.firstName,
         lastName: user.lastName,

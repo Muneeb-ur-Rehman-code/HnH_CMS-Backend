@@ -13,7 +13,7 @@ import ConsultantCountry from '../models/Users/ConsultantCountry.mjs';
 import StudentProfile from '../models/Users/Student.mjs';
 import Initial from '../models/initial/Initial.mjs';
 import Application from '../models/Process/Process.mjs';
-import Invoice from '../models/Inoice/Invoice.mjs';
+import Invoice from '../models/Invoice/Invoice.mjs';
 import Task from '../models/Task/Tasks.mjs';
 import Document from '../models/Docx/Document.mjs';
 
@@ -22,7 +22,7 @@ import { STAFF_ROLE, STAFF_VERIFICATION_STATUS } from '../models/Users/StaffProf
 import { GENDER, EDUCATION_LEVEL, ENGLISH_TEST } from '../models/Users/Student.mjs';
 import { INITIAL_SOURCE, INITIAL_STATUS } from '../models/initial/Initial.mjs';
 import { APPLICATION_STATUS, INTAKE_PREFERENCE, CURRENCY } from '../models/Process/Process.mjs';
-import { INVOICE_STATUS, INVOICE_PAYMENT_TYPE } from '../models/Inoice/Invoice.mjs';
+import { INVOICE_STATUS, INVOICE_PAYMENT_TYPE } from '../models/Invoice/Invoice.mjs';
 import { TASK_STATUS, TASK_PRIORITY } from '../models/Task/Tasks.mjs';
 import { DOCUMENT_TYPE, DOCUMENT_STATUS } from '../models/Docx/Document.mjs';
 

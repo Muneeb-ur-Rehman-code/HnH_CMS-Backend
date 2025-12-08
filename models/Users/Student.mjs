@@ -217,11 +217,11 @@ studentProfileSchema.index({ nationality: 1 });
 // ============================================
 // QUERY MIDDLEWARE - Exclude soft deleted
 // ============================================
-studentProfileSchema.pre(/^find/, function (next) {
+studentProfileSchema.pre(/^find/, function () {
     if (this.getOptions().includeSoftDeleted !== true) {
         this.where({ deletedAt: null });
     }
-    next();
+    // next();
 });
 
 // ============================================

@@ -1,12 +1,12 @@
 // routes/accountant/accountant.mjs
 import express from 'express';
-import Invoice from '../../models/Inoice/Invoice.mjs';
+import Invoice from '../../models/Invoice/Invoice.mjs';
 import Application from '../../models/Process/Process.mjs';
 import User from '../../models/Users/_UsersMain.mjs';
 import { attachUser, requireRole, requireVerifiedStaff } from '../../middlewares/Auth.mjs';
 import { USER_ROLE } from '../../models/Users/_UsersMain.mjs';
 import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
-import { INVOICE_STATUS, PAYMENT_METHOD } from '../../models/Inoice/Invoice.mjs';
+import { INVOICE_STATUS, PAYMENT_METHOD } from '../../models/Invoice/Invoice.mjs';
 import { uploadSingle, deleteFile, replaceFile } from '../../middlewares/upload.mjs';
 
 const router = express.Router();

@@ -406,10 +406,12 @@ userSchema.methods.setPassword = async function (password) {
  * @returns {Promise<boolean>}
  */
 userSchema.methods.verifyPassword = async function (password) {
-    if (!this.password) {
+    // Fetch fresh user with password selected
+    const user = await this.constructor.findById(this._id).select('+password');
+    if (!user || !user.password) {
         throw new Error('Password not set for this user');
     }
-    return bcrypt.compare(password, this.password);
+    return bcrypt.compare(password, user.password);
 };
 
 /**
@@ -424,7 +426,9 @@ userSchema.methods.changePassword = async function (oldPassword, newPassword) {
         throw new Error('Current password is incorrect');
     }
 
-    return this.setPassword(newPassword);
+    // Fetch fresh user instance to set password on
+    const user = await this.constructor.findById(this._id);
+    return user.setPassword(newPassword);
 };
 
 /**
@@ -433,11 +437,13 @@ userSchema.methods.changePassword = async function (oldPassword, newPassword) {
  * @returns {Promise<User>}
  */
 userSchema.methods.resetPassword = async function (newPassword) {
-    if (!this.emailOtp?.verified) {
+    // Fetch fresh user with emailOtp selected
+    const user = await this.constructor.findById(this._id).select('+emailOtp');
+    if (!user.emailOtp?.verified) {
         throw new Error('Email must be verified before resetting password');
     }
 
-    return this.setPassword(newPassword);
+    return user.setPassword(newPassword);
 };
 
 // ============================================
@@ -449,12 +455,14 @@ userSchema.methods.resetPassword = async function (newPassword) {
  * @returns {Promise<{ user: User, otp: string }>}
  */
 userSchema.methods.generateEmailOtp = async function () {
+    // Fetch fresh user data with email OTP
+    const user = await this.constructor.findById(this._id).select('+emailOtp');
     const now = new Date();
 
     // Check cooldown
-    if (this.emailOtp?.lastSentAt) {
+    if (user.emailOtp?.lastSentAt) {
         const cooldownEnd = new Date(
-            this.emailOtp.lastSentAt.getTime() + OTP_CONFIG.COOLDOWN_MINUTES * 60 * 1000
+            user.emailOtp.lastSentAt.getTime() + OTP_CONFIG.COOLDOWN_MINUTES * 60 * 1000
         );
         if (now < cooldownEnd) {
             const remainingSeconds = Math.ceil((cooldownEnd - now) / 1000);
@@ -466,7 +474,7 @@ userSchema.methods.generateEmailOtp = async function () {
 
     const { code, hashedCode, expiresAt } = this.constructor.generateOtp();
 
-    this.emailOtp = {
+    user.emailOtp = {
         code: hashedCode,
         expiresAt,
         attempts: 0,
@@ -475,9 +483,9 @@ userSchema.methods.generateEmailOtp = async function () {
         verified: false
     };
 
-    await this.save();
+    await user.save();
 
-    return { user: this, success: true, otp: code };
+    return { user: user, success: true, otp: code };
 };
 
 /**
@@ -526,14 +534,17 @@ userSchema.methods.verifyEmailOtp = async function (code) {
 
 /**
  * Get email OTP cooldown remaining time in seconds
- * @returns {number}
+ * @returns {Promise<number>}
  */
-userSchema.methods.getEmailOtpCooldownRemaining = function () {
-    if (!this.emailOtp?.lastSentAt) return 0;
+userSchema.methods.getEmailOtpCooldownRemaining = async function () {
+    // Fetch fresh user data with email OTP
+    const user = await this.constructor.findById(this._id).select('+emailOtp');
+    
+    if (!user.emailOtp?.lastSentAt) return 0;
 
     const now = new Date();
     const cooldownEnd = new Date(
-        this.emailOtp.lastSentAt.getTime() + OTP_CONFIG.COOLDOWN_MINUTES * 60 * 1000
+        user.emailOtp.lastSentAt.getTime() + OTP_CONFIG.COOLDOWN_MINUTES * 60 * 1000
     );
 
     if (now >= cooldownEnd) return 0;
@@ -551,16 +562,18 @@ userSchema.methods.getEmailOtpCooldownRemaining = function () {
  */
 userSchema.methods.setPhoneAndGenerateOtp = async function (phoneNumber) {
     // Validate format
-    if (!/^[1-9]\d{9,14}$/.test(phoneNumber)) {
+    if (!/^\+?[1-9]\d{9,14}$/.test(phoneNumber)) {
         throw new Error('Phone number must be in format: country code + number (e.g., 923001234567)');
     }
 
+    // Fetch fresh user data
+    const user = await this.constructor.findById(this._id);
     const now = new Date();
 
     // Check cooldown if same number
-    if (this.phone?.number === phoneNumber && this.phone?.otp?.lastSentAt) {
+    if (user.phone?.number === phoneNumber && user.phone?.otp?.lastSentAt) {
         const cooldownEnd = new Date(
-            this.phone.otp.lastSentAt.getTime() + OTP_CONFIG.COOLDOWN_MINUTES * 60 * 1000
+            user.phone.otp.lastSentAt.getTime() + OTP_CONFIG.COOLDOWN_MINUTES * 60 * 1000
         );
         if (now < cooldownEnd) {
             const remainingSeconds = Math.ceil((cooldownEnd - now) / 1000);
@@ -572,7 +585,7 @@ userSchema.methods.setPhoneAndGenerateOtp = async function (phoneNumber) {
 
     const { code, hashedCode, expiresAt } = this.constructor.generateOtp();
 
-    this.phone = {
+    user.phone = {
         number: phoneNumber,
         otp: {
             code: hashedCode,
@@ -584,73 +597,83 @@ userSchema.methods.setPhoneAndGenerateOtp = async function (phoneNumber) {
         }
     };
 
-    await this.save();
-    return { user: this, otp: code };
+    await user.save();
+    return { user: user, success:true, otp: code };
 };
 
 /**
  * Resend phone OTP
- * @returns {Promise<{ user: User, otp: string }>}
+ * @returns {Promise<{ user: User, otp: string, success: boolean }>}
  */
 userSchema.methods.resendPhoneOtp = async function () {
-    if (!this.phone?.number) {
+    // Fetch fresh user data
+    const user = await this.constructor.findById(this._id);
+    
+    if (!user.phone?.number) {
         throw new Error('No phone number set');
     }
 
-    return this.setPhoneAndGenerateOtp(this.phone.number);
+    const result = await user.setPhoneAndGenerateOtp(user.phone.number);
+    return { ...result, success: true };
 };
 
 /**
  * Verify phone OTP
  * @param {string} code - OTP code to verify
- * @returns {Promise<User>}
+ * @returns {Promise<{ user: User, success: boolean }>}
  */
 userSchema.methods.verifyPhoneOtp = async function (code) {
-    if (!this.phone?.otp?.code) {
+    // Fetch fresh user data with phone OTP
+    const user = await this.constructor.findById(this._id);
+
+    if (!user.phone?.otp?.code) {
         throw new Error('No OTP has been generated for phone');
     }
 
     const now = new Date();
 
     // Check if expired
-    if (now > this.phone.otp.expiresAt) {
+    if (now > user.phone.otp.expiresAt) {
         throw new Error('OTP has expired. Please request a new one');
     }
 
     // Check max attempts
-    if (this.phone.otp.attempts >= OTP_CONFIG.MAX_ATTEMPTS) {
+    if (user.phone.otp.attempts >= OTP_CONFIG.MAX_ATTEMPTS) {
         throw new Error('Maximum OTP attempts exceeded. Please request a new OTP');
     }
 
     // Increment attempts
-    this.phone.otp.attempts += 1;
-    this.phone.otp.lastAttemptAt = now;
+    user.phone.otp.attempts += 1;
+    user.phone.otp.lastAttemptAt = now;
 
     const hashedInput = this.constructor.hashOtp(code);
-    if (hashedInput !== this.phone.otp.code) {
-        await this.save();
-        const remainingAttempts = OTP_CONFIG.MAX_ATTEMPTS - this.phone.otp.attempts;
+    if (hashedInput !== user.phone.otp.code) {
+        await user.save();
+        const remainingAttempts = OTP_CONFIG.MAX_ATTEMPTS - user.phone.otp.attempts;
         throw new Error(`Invalid OTP. ${remainingAttempts} attempts remaining`);
     }
 
     // OTP is valid
-    this.phone.otp.verified = true;
-    this.phone.otp.code = null;
+    user.phone.otp.verified = true;
+    user.phone.otp.code = null;
 
-    await this.save();
-    return this;
+    await user.save();
+    return { user, success: true };
 };
 
 /**
  * Get phone OTP cooldown remaining time in seconds
- * @returns {number}
+ * @returns {Promise<number>}
  */
-userSchema.methods.getPhoneOtpCooldownRemaining = function () {
-    if (!this.phone?.otp?.lastSentAt) return 0;
+userSchema.methods.getPhoneOtpCooldownRemaining = async function () {
+    // Fetch fresh user data with phone OTP
+    const user = await this.constructor.findById(this._id);
+    
+    if (!user.phone?.otp?.lastSentAt) return 0;
 
     const now = new Date();
     const cooldownEnd = new Date(
-        this.phone.otp.lastSentAt.getTime() + OTP_CONFIG.COOLDOWN_MINUTES * 60 * 1000
+        user.phone.otp.lastSentAt.getTime() + OTP_CONFIG.COOLDOWN_MINUTES * 60 * 1000
     );
 
     if (now >= cooldownEnd) return 0;
@@ -663,14 +686,17 @@ userSchema.methods.getPhoneOtpCooldownRemaining = function () {
 
 /**
  * Get registration status for frontend flow
- * @returns {Object}
+ * @returns {Promise<Object>}
  */
-userSchema.methods.getRegistrationStatus = function () {
-    const hasPasswordSet = this.password !== null;
-    const isEmailVerified = this.emailOtp?.verified === true;
-    const isPhoneVerified = this.phone?.otp?.verified === true;
-    const hasPhone = this.phone?.number !== null;
-    const isProfileComplete = !!(this.firstName && this.lastName && this.dob && this.gender);
+userSchema.methods.getRegistrationStatus = async function () {
+    // Fetch fresh user data including hidden fields
+    const user = await this.constructor.findById(this._id).select('+password +emailOtp');
+
+    const hasPasswordSet = !!user.password;
+    const isEmailVerified = user.emailOtp?.verified === true;
+    const isPhoneVerified = user.phone?.otp?.verified === true;
+    const hasPhone = user.phone?.number !== null;
+    const isProfileComplete = !!(user.firstName && user.lastName && user.dob && user.gender);
 
     // Determine current step
     let currentStep = 'EMAIL_VERIFICATION';
@@ -697,19 +723,19 @@ userSchema.methods.getRegistrationStatus = function () {
     }
 
     return {
-        email: this.email,
+        email: user.email,
         isEmailVerified,
         hasPassword: hasPasswordSet,
         hasPhone,
-        phoneNumber: this.phone?.number || null,
+        phoneNumber: user.phone?.number || null,
         isPhoneVerified,
         isProfileComplete,
-        firstName: this.firstName,
-        lastName: this.lastName,
+        firstName: user.firstName,
+        lastName: user.lastName,
         currentStep,
         message,
-        emailOtpCooldownRemaining: this.getEmailOtpCooldownRemaining(),
-        phoneOtpCooldownRemaining: this.getPhoneOtpCooldownRemaining()
+        emailOtpCooldownRemaining: await user.getEmailOtpCooldownRemaining(),
+        phoneOtpCooldownRemaining: await user.getPhoneOtpCooldownRemaining()
     };
 };
 

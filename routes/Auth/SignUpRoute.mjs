@@ -4,8 +4,26 @@ import User from '../../models/Users/_UsersMain.mjs';
 import { sendOTPEmail } from '../../utils/emailService.mjs';
 import { sendOTPviaSMS } from '../../utils/smsService.mjs';
 import { optionalAttachUser } from '../../middlewares/Auth.mjs';
+import { generateToken, verifyToken } from '../../middlewares/jwt.mjs';
 
 const router = express.Router();
+
+// Helper to extract and verify an action token from request
+const requireActionToken = (req, res) => {
+    const authHeader = req.headers.authorization || req.body.token || req.query.token;
+    if (!authHeader) {
+        res.status(401).json({ success: false, message: 'Authorization token required' });
+        return null;
+    }
+
+    try {
+        const decoded = verifyToken(authHeader);
+        return decoded;
+    } catch (err) {
+        res.status(401).json({ success: false, message: err.message || 'Invalid token' });
+        return null;
+    }
+};
 
 // ============================================
 // EMAIL VERIFICATION
@@ -72,6 +90,16 @@ router.post('/send-email-otp', async (req, res) => {
 
     } catch (error) {
         console.error('Send email OTP error:', error);
+
+        // Check for cooldown error
+        if (error.message.includes('Please wait')) {
+            return res.status(429).json({
+                success: false,
+                message: error.message,
+                code: 'COOLDOWN_ACTIVE'
+            });
+        }
+
         return res.status(500).json({
             success: false,
             message: 'Failed to send OTP',
@@ -116,17 +144,39 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
+        // Generate a short-lived action token for completing signup (setting password)
+        const token = generateToken({ userId: user._id.toString(), purpose: 'set_password' }, { expiresIn: '15m' });
+
         return res.status(200).json({
             success: true,
             message: 'Email verified successfully',
             data: {
                 email: normalizedEmail,
-                emailVerified: true
+                emailVerified: true,
+                token
             }
         });
 
     } catch (error) {
         console.error('Verify email OTP error:', error);
+
+        // Check for common OTP errors
+        if (error.message.includes('Invalid OTP')) {
+            return res.status(400).json({
+                success: false,
+                message: error.message,
+                code: 'INVALID_OTP'
+            });
+        }
+
+        if (error.message.includes('expired') || error.message.includes('exceeded')) {
+            return res.status(400).json({
+                success: false,
+                message: error.message,
+                code: 'OTP_ERROR'
+            });
+        }
+
         return res.status(500).json({
             success: false,
             message: 'Failed to verify OTP',
@@ -190,6 +240,16 @@ router.post('/resend-email-otp', async (req, res) => {
 
     } catch (error) {
         console.error('Resend email OTP error:', error);
+
+        // Check for cooldown error
+        if (error.message.includes('Please wait')) {
+            return res.status(429).json({
+                success: false,
+                message: error.message,
+                code: 'COOLDOWN_ACTIVE'
+            });
+        }
+
         return res.status(500).json({
             success: false,
             message: 'Failed to resend OTP',
@@ -219,7 +279,15 @@ router.post('/set-password', async (req, res) => {
 
         const normalizedEmail = email.toLowerCase().trim();
 
-        const user = await User.findOne({ email: normalizedEmail });
+        // Require action token issued after email verification
+        const decoded = requireActionToken(req, res);
+        if (!decoded) return; // response already sent by helper
+
+        if (decoded.purpose !== 'set_password') {
+            return res.status(403).json({ success: false, message: 'Invalid token purpose' });
+        }
+
+        const user = await User.findById(decoded.userId);
 
         if (!user) {
             return res.status(404).json({
@@ -228,13 +296,9 @@ router.post('/set-password', async (req, res) => {
             });
         }
 
-        // Check if email is verified
-        if (!user.emailVerified) {
-            return res.status(403).json({
-                success: false,
-                message: 'Please verify your email first',
-                code: 'EMAIL_NOT_VERIFIED'
-            });
+        // Ensure token belongs to this email (extra safety)
+        if (user.email && user.email.toLowerCase().trim() !== normalizedEmail) {
+            return res.status(403).json({ success: false, message: 'Token does not match email' });
         }
 
         // Check if password already set
@@ -247,14 +311,18 @@ router.post('/set-password', async (req, res) => {
         }
 
         // Set password (will be hashed by pre-save hook)
-        user.password = password;
-        await user.save();
+        await user.setPassword(password);
+        // await user.save();
+
+        // Issue a normal auth token (uses default expiry from env/JWT_EXPIRY)
+        const authToken = generateToken({ userId: user._id.toString() });
 
         return res.status(200).json({
             success: true,
             message: 'Password set successfully',
             data: {
-                email: normalizedEmail
+                email: normalizedEmail,
+                token: authToken
             }
         });
 
@@ -299,23 +367,28 @@ router.post('/send-phone-otp', async (req, res) => {
 
         const normalizedEmail = email.toLowerCase().trim();
 
-        const user = await User.findOne({ email: normalizedEmail });
+        // Require a valid token (either action token or regular auth) matching this user
+        const decoded = requireActionToken(req, res);
+        if (!decoded) return;
 
-        if (!user) {
+        const user = await User.findById(decoded.userId);
+
+        if (!user || (user.email && user.email.toLowerCase().trim() !== normalizedEmail)) {
             return res.status(404).json({
                 success: false,
-                message: 'User not found'
+                message: 'User not found or token mismatch'
             });
         }
 
         // Check if password is set
-        if (!user.password) {
+        if (!user.hasPassword) {
             return res.status(403).json({
                 success: false,
                 message: 'Please set password first',
                 code: 'PASSWORD_NOT_SET'
             });
         }
+
 
         // Update phone number if changed
         if (user.phoneNumber !== phoneNumber) {
@@ -324,8 +397,8 @@ router.post('/send-phone-otp', async (req, res) => {
             await user.save();
         }
 
-        // Send OTP
-        const result = await user.sendPhoneOTP();
+        // Send OTP (model method)
+        const result = await user.setPhoneAndGenerateOtp(phoneNumber);
 
         if (!result.success) {
             return res.status(400).json({
@@ -337,7 +410,6 @@ router.post('/send-phone-otp', async (req, res) => {
 
         // Send SMS
         await sendOTPviaSMS(phoneNumber, result.otp);
-
         return res.status(200).json({
             success: true,
             message: 'OTP sent to your phone',
@@ -349,6 +421,15 @@ router.post('/send-phone-otp', async (req, res) => {
 
     } catch (error) {
         console.error('Send phone OTP error:', error);
+
+        // Check for cooldown error
+        if (error.message.includes('Please wait')) {
+            return res.status(429).json({
+                success: false,
+                message: error.message,
+                code: 'COOLDOWN_ACTIVE'
+            });
+        }
 
         if (error.name === 'ValidationError') {
             const messages = Object.values(error.errors).map(err => err.message);
@@ -383,17 +464,18 @@ router.post('/verify-phone-otp', async (req, res) => {
 
         const normalizedEmail = email.toLowerCase().trim();
 
-        const user = await User.findOne({ email: normalizedEmail });
+        // Require a valid token and ensure it matches the user
+        const decoded = requireActionToken(req, res);
+        if (!decoded) return;
 
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
+        const user = await User.findById(decoded.userId);
+
+        if (!user || (user.email && user.email.toLowerCase().trim() !== normalizedEmail)) {
+            return res.status(404).json({ success: false, message: 'User not found or token mismatch' });
         }
 
         // Verify OTP
-        const result = await user.verifyPhoneOTP(otp);
+        const result = await user.verifyPhoneOtp(otp);
 
         if (!result.success) {
             return res.status(400).json({
@@ -413,6 +495,32 @@ router.post('/verify-phone-otp', async (req, res) => {
 
     } catch (error) {
         console.error('Verify phone OTP error:', error);
+
+        // Check for common OTP errors
+        if (error.message.includes('Please wait')) {
+            return res.status(429).json({
+                success: false,
+                message: error.message,
+                code: 'COOLDOWN_ACTIVE'
+            });
+        }
+
+        if (error.message.includes('Invalid OTP')) {
+            return res.status(400).json({
+                success: false,
+                message: error.message,
+                code: 'INVALID_OTP'
+            });
+        }
+
+        if (error.message.includes('expired') || error.message.includes('exceeded')) {
+            return res.status(400).json({
+                success: false,
+                message: error.message,
+                code: 'OTP_ERROR'
+            });
+        }
+
         return res.status(500).json({
             success: false,
             message: 'Failed to verify OTP',
@@ -438,13 +546,14 @@ router.post('/resend-phone-otp', async (req, res) => {
 
         const normalizedEmail = email.toLowerCase().trim();
 
-        const user = await User.findOne({ email: normalizedEmail });
+        // Require token and ensure it matches the user
+        const decoded = requireActionToken(req, res);
+        if (!decoded) return;
 
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
+        const user = await User.findById(decoded.userId);
+
+        if (!user || (user.email && user.email.toLowerCase().trim() !== normalizedEmail)) {
+            return res.status(404).json({ success: false, message: 'User not found or token mismatch' });
         }
 
         if (!user.phoneNumber) {
@@ -483,6 +592,16 @@ router.post('/resend-phone-otp', async (req, res) => {
 
     } catch (error) {
         console.error('Resend phone OTP error:', error);
+
+        // Check for cooldown error
+        if (error.message.includes('Please wait')) {
+            return res.status(429).json({
+                success: false,
+                message: error.message,
+                code: 'COOLDOWN_ACTIVE'
+            });
+        }
+
         return res.status(500).json({
             success: false,
             message: 'Failed to resend OTP',
@@ -590,9 +709,9 @@ router.get('/otp-cooldown', async (req, res) => {
         let cooldown = null;
 
         if (type === 'email') {
-            cooldown = user.getEmailOTPCooldown();
+            cooldown = await user.getEmailOtpCooldownRemaining();
         } else if (type === 'phone') {
-            cooldown = user.getPhoneOTPCooldown();
+            cooldown = await user.getPhoneOtpCooldownRemaining();
         } else {
             return res.status(400).json({
                 success: false,

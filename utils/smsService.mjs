@@ -1,7 +1,7 @@
 // utils/smsService.mjs
 
 import { Vonage } from '@vonage/server-sdk';
-import {X, T, E } from "../config/constants.mjs"
+import {X, T, E, P } from "../config/constants.mjs"
 
 // ============================================
 // VONAGE CLIENT CONFIGURATION
@@ -40,6 +40,7 @@ const formatPhoneNumber = (phone) => {
 
 export const sendOTPviaSMS = async (phone, otp) => {
     const formattedPhone = formatPhoneNumber(phone);
+    console.log(P + `Sending SMS to ${formattedPhone} with OTP: ${otp}`);
 
     const message = `Your ${BRAND_NAME} verification code is: ${otp}. This code expires in 10 minutes. Do not share this code with anyone.`;
 

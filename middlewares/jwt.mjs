@@ -9,13 +9,15 @@ const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
  * @param {Object} payload - Data to encode in token
  * @returns {string} - Bearer token
  */
-export const generateToken = (payload) => {
+export const generateToken = (payload, options = {}) => {
     if (!JWT_SECRET) {
         throw new Error('JWT_SECRET is not defined in environment variables');
     }
 
+    const expiresIn = options.expiresIn || JWT_EXPIRY;
+
     const token = jwt.sign(payload, JWT_SECRET, {
-        expiresIn: JWT_EXPIRY
+        expiresIn
     });
 
     return `Bearer ${token}`;

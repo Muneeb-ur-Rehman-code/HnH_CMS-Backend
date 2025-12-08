@@ -57,7 +57,7 @@ router.post('/login', async (req, res) => {
         }
 
         // Check if password is set
-        if (!user.password) {
+        if (!user.hasPassword) {
             return res.status(400).json({
                 success: false,
                 message: 'Password not set. Please complete signup first.',
@@ -66,7 +66,7 @@ router.post('/login', async (req, res) => {
         }
 
         // Verify password
-        const isPasswordValid = await user.comparePassword(password);
+        const isPasswordValid = await user.verifyPassword(password);
 
         if (!isPasswordValid) {
             return res.status(401).json({
@@ -126,8 +126,8 @@ router.post('/login', async (req, res) => {
  * Logout (client-side should clear token)
  */
 router.post('/logout', (req, res) => {
-    // In a stateless JWT system, logout is handled client-side
-    // This endpoint is optional and can be used for logging purposes
+        // In a stateless JWT system, logout is handled client-side
+        // This endpoint is optional and can be used for logging purposes
     return res.status(200).json({
         success: true,
         message: 'Logout successful. Please clear your token.'

@@ -643,30 +643,29 @@ router.get('/status', async (req, res) => {
             });
         }
 
-        // Check if user has password (completed signup)
-        if (user.password) {
-            return res.status(200).json({
-                success: true,
-                data: {
-                    exists: true,
-                    hasPassword: true,
-                    message: 'Please login'
-                }
-            });
-        }
+        // Use model helper that fetches sensitive fields to compute registration status
+        const reg = await user.getRegistrationStatus();
+
+        // if (reg.hasPassword) {
+        //     return res.status(200).json({
+        //         success: true,
+        //         data: {
+        //             exists: true,
+        //             hasPassword: true,
+        //             message: 'Please login'
+        //         }
+        //     });
+        // }
 
         return res.status(200).json({
             success: true,
             data: {
                 exists: true,
-                hasPassword: false,
-                emailVerified: user.emailVerified,
-                phoneNumber: user.phoneNumber ? true : false,
-                phoneVerified: user.phoneVerified,
-                firstName: user.firstName ? true : false,
-                currentStep: user.emailVerified
-                    ? (user.password ? (user.phoneVerified ? 'basic-info' : 'phone-verification') : 'set-password')
-                    : 'email-verification'
+                hasPassword: reg.hasPassword,
+                emailVerified: reg.isEmailVerified,
+                phoneVerified: reg.isPhoneVerified,
+                firstName: reg.firstName ? true : false,
+                currentStep: reg.currentStep
             }
         });
 

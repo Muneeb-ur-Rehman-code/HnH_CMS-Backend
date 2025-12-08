@@ -1,7 +1,7 @@
 // routes/onboarding/onboarding.mjs
 import express from 'express';
 import User from '../../models/Users/_UsersMain.mjs';
-import { attachUser, requireEmailVerified, requirePasswordSet, requirePhoneVerified } from '../../middlewares/auth.mjs';
+import { attachUser, requireEmailVerified, requirePasswordSet, requirePhoneVerified } from '../../middlewares/Auth.mjs';
 import { generateToken } from '../../middlewares/jwt.mjs';
 
 const router = express.Router();

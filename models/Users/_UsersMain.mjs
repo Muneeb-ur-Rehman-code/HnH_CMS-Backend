@@ -261,8 +261,9 @@ userSchema.pre(/^find/, function () {
 // VIRTUALS
 // ============================================
 userSchema.virtual('fullName').get(function () {
-    if (!this.firstName && !this.lastName) return null;
-    return [this.firstName, this.lastName].filter(Boolean).join(' ');
+    // Return a display name based on first name only
+    if (!this.firstName) return null;
+    return this.firstName;
 });
 
 userSchema.virtual('isEmailVerified').get(function () {
@@ -274,7 +275,8 @@ userSchema.virtual('isPhoneVerified').get(function () {
 });
 
 userSchema.virtual('hasPassword').get(function () {
-    return this.password !== null;
+    // Treat missing or falsy password as not set
+    return !!this.password;
 });
 
 userSchema.virtual('isDeleted').get(function () {
@@ -539,7 +541,7 @@ userSchema.methods.verifyEmailOtp = async function (code) {
 userSchema.methods.getEmailOtpCooldownRemaining = async function () {
     // Fetch fresh user data with email OTP
     const user = await this.constructor.findById(this._id).select('+emailOtp');
-    
+
     if (!user.emailOtp?.lastSentAt) return 0;
 
     const now = new Date();
@@ -598,7 +600,7 @@ userSchema.methods.setPhoneAndGenerateOtp = async function (phoneNumber) {
     };
 
     await user.save();
-    return { user: user, success:true, otp: code };
+    return { user: user, success: true, otp: code };
 };
 
 /**
@@ -608,7 +610,7 @@ userSchema.methods.setPhoneAndGenerateOtp = async function (phoneNumber) {
 userSchema.methods.resendPhoneOtp = async function () {
     // Fetch fresh user data
     const user = await this.constructor.findById(this._id);
-    
+
     if (!user.phone?.number) {
         throw new Error('No phone number set');
     }
@@ -668,7 +670,7 @@ userSchema.methods.verifyPhoneOtp = async function (code) {
 userSchema.methods.getPhoneOtpCooldownRemaining = async function () {
     // Fetch fresh user data with phone OTP
     const user = await this.constructor.findById(this._id);
-    
+
     if (!user.phone?.otp?.lastSentAt) return 0;
 
     const now = new Date();

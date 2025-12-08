@@ -5,6 +5,7 @@ import StaffProfile from '../../models/Users/StaffProfile.mjs';
 import { USER_ROLE, USER_SOURCE, USER_STATUS } from '../../models/Users/_UsersMain.mjs';
 import { STAFF_ROLE, STAFF_VERIFICATION_STATUS } from '../../models/Users/StaffProfile.mjs';
 import { sendOTPEmail } from '../../utils/emailService.mjs';
+import { generateToken } from '../../middlewares/jwt.mjs';
 
 const router = express.Router();
 
@@ -33,31 +34,34 @@ router.post('/send-email-otp', async (req, res) => {
         let user = await User.findOne({ email: normalizedEmail });
 
         // If user exists and has password, they should login
-        if (user && user.password) {
-            return res.status(400).json({
-                success: false,
-                message: 'User already exists. Please login.',
-                code: 'USER_EXISTS'
-            });
+            if (user) {
+                if (await user.hasPasswordAsync()) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'User already exists. Please login.',
+                    code: 'USER_EXISTS'
+                });
+            }
         }
 
         // If user doesn't exist, create new user with STAFF role
         if (!user) {
             user = await User.create({
                 email: normalizedEmail,
-                role: USER_ROLE.STAFF, // Staff role set immediately
+                role: USER_ROLE.STAFF,
                 source: USER_SOURCE.ONLINE
             });
         } else {
             // Update existing user to staff if they don't have password
-            if (!user.password && user.role === USER_ROLE.STUDENT) {
+            const hasPasswordExisting = await user.hasPasswordAsync();
+            if (!hasPasswordExisting && user.role === USER_ROLE.STUDENT) {
                 user.role = USER_ROLE.STAFF;
                 await user.save();
             }
         }
 
         // Send OTP
-        const result = await user.sendEmailOTP();
+        const result = await user.generateEmailOtp();
 
         if (!result.success) {
             return res.status(400).json({
@@ -132,7 +136,7 @@ router.post('/verify-email-otp', async (req, res) => {
         }
 
         // Verify OTP
-        const result = await user.verifyEmailOTP(otp);
+        const result = await user.verifyEmailOtp(otp);
 
         if (!result.success) {
             return res.status(400).json({
@@ -156,6 +160,9 @@ router.post('/verify-email-otp', async (req, res) => {
             await staffProfile.save();
         }
 
+        // Generate short-lived action token for setting password (same as general signup flow)
+        const token = generateToken({ userId: user._id.toString(), purpose: 'set_password' }, { expiresIn: '15m' });
+
         return res.status(200).json({
             success: true,
             message: 'Email verified successfully. Your staff account is pending verification by an administrator.',
@@ -163,7 +170,8 @@ router.post('/verify-email-otp', async (req, res) => {
                 email: normalizedEmail,
                 emailVerified: true,
                 staffRole,
-                verificationStatus: STAFF_VERIFICATION_STATUS.UNVERIFIED
+                verificationStatus: STAFF_VERIFICATION_STATUS.UNVERIFIED,
+                token
             }
         });
 
@@ -282,18 +290,21 @@ router.get('/status', async (req, res) => {
             });
         }
 
-        // Check if user has password (completed signup)
-        if (user.password) {
-            // Get staff profile
-            const staffProfile = await StaffProfile.findOne({ userId: user._id });
+        // Use model helper to get fresh registration status (includes hidden fields)
+        const reg = await user.getRegistrationStatus();
 
+        // Get staff profile
+        const staffProfile = await StaffProfile.findOne({ userId: user._id });
+
+        if (reg.hasPassword) {
             return res.status(200).json({
                 success: true,
                 data: {
                     exists: true,
                     hasPassword: true,
-                    emailVerified: user.emailVerified,
-                    phoneVerified: user.phoneVerified,
+                    emailVerified: reg.isEmailVerified,
+                    phoneNumber: reg.phoneNumber ? true : false,
+                    phoneVerified: reg.isPhoneVerified,
                     staffRole: staffProfile?.staffRole || null,
                     verificationStatus: staffProfile?.verificationStatus || null,
                     message: staffProfile?.verificationStatus === STAFF_VERIFICATION_STATUS.VERIFIED
@@ -303,22 +314,17 @@ router.get('/status', async (req, res) => {
             });
         }
 
-        // Get staff profile if exists
-        const staffProfile = await StaffProfile.findOne({ userId: user._id });
-
         return res.status(200).json({
             success: true,
             data: {
                 exists: true,
                 hasPassword: false,
-                emailVerified: user.emailVerified,
-                phoneNumber: user.phoneNumber ? true : false,
-                phoneVerified: user.phoneVerified,
+                emailVerified: reg.isEmailVerified,
+                phoneNumber: reg.phoneNumber ? true : false,
+                phoneVerified: reg.isPhoneVerified,
                 staffRole: staffProfile?.staffRole || null,
                 verificationStatus: staffProfile?.verificationStatus || null,
-                currentStep: user.emailVerified
-                    ? (user.password ? (user.phoneVerified ? 'complete' : 'phone-verification') : 'set-password')
-                    : 'email-verification'
+                currentStep: reg.currentStep
             }
         });
 

@@ -50,12 +50,15 @@ router.post('/send-email-otp', async (req, res) => {
         let user = await User.findOne({ email: normalizedEmail });
 
         // If user exists and has password, they should login
-        if (user && user.password) {
-            return res.status(400).json({
-                success: false,
-                message: 'User already exists. Please login.',
-                code: 'USER_EXISTS'
-            });
+        if (user) {
+            const hasPassword = await user.hasPasswordAsync();
+            if (hasPassword) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'User already exists. Please login.',
+                    code: 'USER_EXISTS'
+                });
+            }
         }
 
         // If user doesn't exist, create new user
@@ -212,7 +215,7 @@ router.post('/resend-email-otp', async (req, res) => {
         }
 
         // Check if already verified
-        if (user.emailVerified) {
+        if (await user.isEmailVerifiedAsync()) {
             return res.status(400).json({
                 success: false,
                 message: 'Email already verified'
@@ -381,7 +384,7 @@ router.post('/send-phone-otp', async (req, res) => {
         }
 
         // Check if password is set
-        if (!user.hasPassword) {
+        if (!(await user.hasPasswordAsync())) {
             return res.status(403).json({
                 success: false,
                 message: 'Please set password first',
@@ -564,7 +567,7 @@ router.post('/resend-phone-otp', async (req, res) => {
         }
 
         // Check if already verified
-        if (user.phoneVerified) {
+        if (await user.isPhoneVerifiedAsync()) {
             return res.status(400).json({
                 success: false,
                 message: 'Phone already verified'

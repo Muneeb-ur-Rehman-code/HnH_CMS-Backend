@@ -171,7 +171,7 @@ export const requireAdmin = requireRole(USER_ROLE.ADMIN);
 /**
  * Require email to be verified
  */
-export const requireEmailVerified = (req, res, next) => {
+export const requireEmailVerified = async (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({
             success: false,
@@ -179,21 +179,25 @@ export const requireEmailVerified = (req, res, next) => {
         });
     }
 
-    if (!req.user.emailVerified) {
-        return res.status(403).json({
-            success: false,
-            message: 'Email verification required',
-            code: 'EMAIL_NOT_VERIFIED'
-        });
+    try {
+        const verified = await req.user.isEmailVerifiedAsync();
+        if (!verified) {
+            return res.status(403).json({
+                success: false,
+                message: 'Email verification required',
+                code: 'EMAIL_NOT_VERIFIED'
+            });
+        }
+        next();
+    } catch (err) {
+        return res.status(500).json({ success: false, message: 'Error checking email verification', error: err.message });
     }
-
-    next();
 };
 
 /**
  * Require phone to be verified
  */
-export const requirePhoneVerified = (req, res, next) => {
+export const requirePhoneVerified = async (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({
             success: false,
@@ -201,29 +205,35 @@ export const requirePhoneVerified = (req, res, next) => {
         });
     }
 
-    if (!req.user.phoneNumber) {
-        return res.status(403).json({
-            success: false,
-            message: 'Phone number required',
-            code: 'PHONE_NOT_SET'
-        });
-    }
+    try {
+        const phoneNumberPresent = !!(req.user.phoneNumber || req.user.phone?.number);
+        if (!phoneNumberPresent) {
+            return res.status(403).json({
+                success: false,
+                message: 'Phone number required',
+                code: 'PHONE_NOT_SET'
+            });
+        }
 
-    if (!req.user.phoneVerified) {
-        return res.status(403).json({
-            success: false,
-            message: 'Phone verification required',
-            code: 'PHONE_NOT_VERIFIED'
-        });
-    }
+        const verified = await req.user.isPhoneVerifiedAsync();
+        if (!verified) {
+            return res.status(403).json({
+                success: false,
+                message: 'Phone verification required',
+                code: 'PHONE_NOT_VERIFIED'
+            });
+        }
 
-    next();
+        next();
+    } catch (err) {
+        return res.status(500).json({ success: false, message: 'Error checking phone verification', error: err.message });
+    }
 };
 
 /**
  * Require password to be set
  */
-export const requirePasswordSet = (req, res, next) => {
+export const requirePasswordSet = async (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({
             success: false,
@@ -231,15 +241,19 @@ export const requirePasswordSet = (req, res, next) => {
         });
     }
 
-    if (!req.user.password) {
-        return res.status(403).json({
-            success: false,
-            message: 'Password not set. Please complete signup.',
-            code: 'PASSWORD_NOT_SET'
-        });
+    try {
+        const hasPassword = await req.user.hasPasswordAsync();
+        if (!hasPassword) {
+            return res.status(403).json({
+                success: false,
+                message: 'Password not set. Please complete signup.',
+                code: 'PASSWORD_NOT_SET'
+            });
+        }
+        next();
+    } catch (err) {
+        return res.status(500).json({ success: false, message: 'Error checking password', error: err.message });
     }
-
-    next();
 };
 
 /**

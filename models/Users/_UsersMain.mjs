@@ -741,6 +741,54 @@ userSchema.methods.getRegistrationStatus = async function () {
     };
 };
 
+// ============================================
+// ASYNC HELPERS (fetch hidden fields when needed)
+// ============================================
+
+/**
+ * Check if user has password (fetches password field)
+ * @returns {Promise<boolean>}
+ */
+userSchema.methods.hasPasswordAsync = async function () {
+    const user = await this.constructor.findById(this._id).select('+password');
+    return !!user?.password;
+};
+
+/**
+ * Check if email is verified (fetches emailOtp)
+ * @returns {Promise<boolean>}
+ */
+userSchema.methods.isEmailVerifiedAsync = async function () {
+    const user = await this.constructor.findById(this._id).select('+emailOtp');
+    return user.emailOtp?.verified === true;
+};
+
+/**n * Check if phone is verified (fetches phone otp)
+ * @returns {Promise<boolean>}
+ */
+userSchema.methods.isPhoneVerifiedAsync = async function () {
+    const user = await this.constructor.findById(this._id);
+    return user.phone?.otp?.verified === true;
+};
+
+/**
+ * Get display name (relies on firstName)
+ * @returns {Promise<string|null>}
+ */
+userSchema.methods.getFullNameAsync = async function () {
+    const user = await this.constructor.findById(this._id);
+    return user.firstName || null;
+};
+
+/**
+ * Check if profile is complete (fetches profile fields)
+ * @returns {Promise<boolean>}
+ */
+userSchema.methods.isProfileCompleteAsync = async function () {
+    const user = await this.constructor.findById(this._id);
+    return !!(user.firstName && user.lastName && user.dob && user.gender);
+};
+
 /**
  * Update last login
  * @returns {Promise<User>}

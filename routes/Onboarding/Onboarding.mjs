@@ -60,8 +60,8 @@ router.post('/basic-info', attachUser, requireEmailVerified, requirePasswordSet,
                     dateOfBirth: user.dateOfBirth,
                     gender: user.gender,
                     role: user.role,
-                    emailVerified: user.emailVerified,
-                    phoneVerified: user.phoneVerified
+                    emailVerified: await user.isEmailVerifiedAsync(),
+                    phoneVerified: await user.isPhoneVerifiedAsync()
                 },
                 token
             }
@@ -148,19 +148,20 @@ router.get('/status', attachUser, async (req, res) => {
         const user = req.user;
 
         const status = {
-            emailVerified: user.emailVerified,
-            passwordSet: !!user.password,
-            phoneNumberSet: !!user.phoneNumber,
-            phoneVerified: user.phoneVerified,
-            basicInfoSet: !!(user.firstName && user.lastName),
-            onboardingComplete: !!(
-                user.emailVerified &&
-                user.password &&
-                user.phoneVerified &&
-                user.firstName &&
-                user.lastName
-            )
+            emailVerified: await user.isEmailVerifiedAsync(),
+            passwordSet: await user.hasPasswordAsync(),
+            phoneNumberSet: !!(user.phoneNumber || user.phone?.number),
+            phoneVerified: await user.isPhoneVerifiedAsync(),
+            basicInfoSet: !!(user.firstName && user.lastName)
         };
+
+        status.onboardingComplete = !!(
+            status.emailVerified &&
+            status.passwordSet &&
+            status.phoneVerified &&
+            user.firstName &&
+            user.lastName
+        );
 
         // Determine current step
         let currentStep = 'complete';

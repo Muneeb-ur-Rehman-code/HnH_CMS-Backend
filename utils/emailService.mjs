@@ -6,8 +6,8 @@ import { X, T } from "../config/constants.mjs";
 // ============================================
 
 const mailjet = new Mailjet({
-  apiKey: process.env.MJ_API_KEY,
-  apiSecret: process.env.MJ_API_SECRET,
+    apiKey: process.env.MJ_API_KEY,
+    apiSecret: process.env.MJ_API_SECRET,
 });
 
 // ============================================
@@ -97,21 +97,21 @@ const createButton = (text, url) => `
 // ============================================
 
 const sendMail = async ({ to, subject, html }) => {
-  return await mailjet
-    .post("send", { version: "v3.1" })
-    .request({
-      Messages: [
-        {
-          From: {
-            Email: process.env.SMTP_FROM,
-            Name: process.env.APP_NAME,
-          },
-          To: [{ Email: to }],
-          Subject: subject,
-          HTMLPart: html,
-        },
-      ],
-    });
+    return await mailjet
+        .post("send", { version: "v3.1" })
+        .request({
+            Messages: [
+                {
+                    From: {
+                        Email: process.env.MAILJET_FROM_EMAIL,
+                        Name: process.env.APP_NAME,
+                    },
+                    To: [{ Email: to }],
+                    Subject: subject,
+                    HTMLPart: html,
+                },
+            ],
+        });
 };
 
 
@@ -120,7 +120,7 @@ const sendMail = async ({ to, subject, html }) => {
 // ============================================
 
 export const sendOTPEmail = async (email, otp) => {
-  const content = `
+    const content = `
     <div style="text-align: center;">
       <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 600;">Verification Code</h1>
       <p style="margin: 0 0 32px; color: #666;">Use the code below to verify</p>
@@ -149,11 +149,11 @@ export const sendOTPEmail = async (email, otp) => {
     </div>
   `;
 
-  return await sendMail({
-    to: email,
-    subject: `${otp} is your verification code`,
-    html: baseTemplate(content, email),
-  });
+    return await sendMail({
+        to: email,
+        subject: `${otp} is your verification code`,
+        html: baseTemplate(content, email),
+    });
 };
 
 
@@ -162,9 +162,9 @@ export const sendOTPEmail = async (email, otp) => {
 // ============================================
 
 export const sendStaffApprovedEmail = async (email, role) => {
-  const loginUrl = `${process.env.FRONTEND_URL}/login`;
+    const loginUrl = `${process.env.FRONTEND_URL}/login`;
 
-  const content = `
+    const content = `
     <div style="text-align:center;">
       <h1 style="margin:0 0 8px; font-size:28px; font-weight:600;">Congratulations!</h1>
       <p style="margin:0 0 32px; color:#666;">Your account has been approved</p>
@@ -185,11 +185,11 @@ export const sendStaffApprovedEmail = async (email, role) => {
     </div>
   `;
 
-  return await sendMail({
-    to: email,
-    subject: `Account Approved - Welcome as ${role}`,
-    html: baseTemplate(content, email),
-  });
+    return await sendMail({
+        to: email,
+        subject: `Account Approved - Welcome as ${role}`,
+        html: baseTemplate(content, email),
+    });
 };
 
 
@@ -198,9 +198,9 @@ export const sendStaffApprovedEmail = async (email, role) => {
 // ============================================
 
 export const sendStudentApprovalEmail = async (email, consultantName = 'Your Consultant') => {
-  const loginUrl = `${process.env.FRONTEND_URL}/login`;
+    const loginUrl = `${process.env.FRONTEND_URL}/login`;
 
-  const content = `
+    const content = `
     <div style="text-align:center;">
       <h1 style="margin:0 0 8px; font-size:24px; font-weight:600;">Your Account Has Been Created</h1>
       <p style="margin:0 0 32px; color:#666;">Welcome aboard!</p>
@@ -220,11 +220,11 @@ export const sendStudentApprovalEmail = async (email, consultantName = 'Your Con
     </div>
   `;
 
-  return await sendMail({
-    to: email,
-    subject: "Your Account Has Been Created",
-    html: baseTemplate(content, email),
-  });
+    return await sendMail({
+        to: email,
+        subject: "Your Account Has Been Created",
+        html: baseTemplate(content, email),
+    });
 };
 
 
@@ -233,9 +233,9 @@ export const sendStudentApprovalEmail = async (email, consultantName = 'Your Con
 // ============================================
 
 export const sendNotificationEmail = async (email, message, subject = 'Notification') => {
-  const dashboardUrl = `${process.env.FRONTEND_URL}/dashboard`;
+    const dashboardUrl = `${process.env.FRONTEND_URL}/dashboard`;
 
-  const content = `
+    const content = `
     <div>
       <h1 style="text-align:center; margin:0 0 24px; font-size:22px;">${subject}</h1>
 
@@ -254,11 +254,11 @@ export const sendNotificationEmail = async (email, message, subject = 'Notificat
     </div>
   `;
 
-  return await sendMail({
-    to: email,
-    subject,
-    html: baseTemplate(content, email),
-  });
+    return await sendMail({
+        to: email,
+        subject,
+        html: baseTemplate(content, email),
+    });
 };
 
 
@@ -267,14 +267,14 @@ export const sendNotificationEmail = async (email, message, subject = 'Notificat
 // ============================================
 
 export const verifyEmailConnection = async () => {
-  try {
-    await mailjet.get("sender").request();
-    console.log(T + "Mailjet API connected successfully");
-    return true;
-  } catch (error) {
-    console.error(X + "Mailjet connection failed:", error.message);
-    return false;
-  }
+    try {
+        await mailjet.get("sender").request();
+        console.log(T + "Mailjet API connected successfully");
+        return true;
+    } catch (error) {
+        console.error(X + "Mailjet connection failed:", error.message);
+        return false;
+    }
 };
 
 
@@ -283,9 +283,9 @@ export const verifyEmailConnection = async () => {
 // ============================================
 
 export default {
-  sendOTPEmail,
-  sendStaffApprovedEmail,
-  sendStudentApprovalEmail,
-  sendNotificationEmail,
-  verifyEmailConnection,
+    sendOTPEmail,
+    sendStaffApprovedEmail,
+    sendStudentApprovalEmail,
+    sendNotificationEmail,
+    verifyEmailConnection,
 };

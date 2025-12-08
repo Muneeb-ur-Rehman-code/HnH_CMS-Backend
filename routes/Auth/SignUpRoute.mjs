@@ -48,7 +48,7 @@ router.post('/send-email-otp', async (req, res) => {
         }
 
         // Send OTP
-        const result = await user.sendEmailOTP();
+        const result = await user.generateEmailOtp();
 
         if (!result.success) {
             return res.status(400).json({

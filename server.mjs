@@ -43,6 +43,17 @@ app.get(['/', '/health', '/health-check'], (req, res) => { res.json({ message: '
 
 //
 
+//====================================================BUILD FOLDER SERVE
+
+app.get('/run-sample-seed', async (req, res) => {
+    try {
+        await import('./seeds/seeder-Sample.mjs').then(m => m.default());
+        res.send('Seed executed');
+    } catch (e) {
+        res.status(500).send(e.message);
+    }
+});
+
 //====================================================404 + 500 Handle
 
 app.use((req, res) => {

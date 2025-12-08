@@ -378,7 +378,7 @@ async function seedDocuments() {
 // MAIN SEEDER FUNCTION
 // ============================================ 
 
-async function seedDatabase() {
+async function seedDatabase({ exitOnFinish = false } = {}) {
     try {
         console.log('\n' + '='.repeat(60));
         log('SAMPLE DATABASE SEEDER (MULTI-ACCOUNT SETUP)', CYAN);
@@ -387,7 +387,8 @@ async function seedDatabase() {
         const MONGO_URI = process.env.MONGO_URI;
         if (!MONGO_URI) {
             error('MONGO_URI not found in environment variables');
-            process.exit(1);
+            if (exitOnFinish) process.exit(1);
+            throw new Error('MONGO_URI not found in environment variables');
         }
 
         progress('Connecting to database...');
@@ -427,13 +428,20 @@ async function seedDatabase() {
         console.error('\n');
         error('ERROR during seeding:');
         console.error(err);
-        process.exit(1);
+        if (exitOnFinish) process.exit(1);
+        throw err;
     } finally {
         await mongoose.disconnect();
         log('Disconnected from database');
-        process.exit(0);
+        if (exitOnFinish) process.exit(0);
     }
 }
 
-// Run seeder
-seedDatabase();
+// Exports for programmatic usage
+export { seedDatabase };
+export default seedDatabase;
+
+// If this file is run directly from the command line, run with process exit handling
+if (process.argv[1] === __filename) {
+    seedDatabase({ exitOnFinish: true });
+}

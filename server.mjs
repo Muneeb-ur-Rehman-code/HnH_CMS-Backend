@@ -16,6 +16,7 @@ import { verifySMSConnection } from './utils/smsService.mjs';
 // import { sendNotificationEmail } from './utils/emailService.mjs';
 // import { sendOTPviaSMS } from './utils/smsService.mjs';
 import routes from "./routes/Routes.mjs"
+import seedDatabase from './seeds/seeder-Sample.mjs';
 
 //====================================================INITIALIZATION
 
@@ -47,8 +48,7 @@ app.get(['/', '/health', '/health-check'], (req, res) => { res.json({ message: '
 
 app.get('/run-sample-seed', async (req, res) => {
     try {
-        await import('./seeds/seeder-Sample.mjs').then(m => m.default());
-        res.send('Seed executed');
+        await seedDatabase();
     } catch (e) {
         res.status(500).send(e.message);
     }

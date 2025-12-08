@@ -5,7 +5,8 @@
     "main": "server.mjs",
     "scripts": {
         "start": "nodemon server.mjs",
-        "run": "node server.mjs"
+        "run": "node server.mjs",
+        "seed:sample": "node seeds/seeder-Sample.mjs"
     },
     "dependencies": {
         "@vonage/server-sdk": "^3.25.1",

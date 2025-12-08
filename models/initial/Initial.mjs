@@ -186,11 +186,11 @@ initialSchema.index({ createdAt: -1 });
 // ============================================
 // QUERY MIDDLEWARE - Exclude soft deleted
 // ============================================
-initialSchema.pre(/^find/, function (next) {
+initialSchema.pre(/^find/, function () {
     if (this.getOptions().includeSoftDeleted !== true) {
         this.where({ deletedAt: null });
     }
-    next();
+    // next();
 });
 
 // ============================================

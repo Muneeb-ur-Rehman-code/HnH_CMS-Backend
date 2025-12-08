@@ -4,12 +4,13 @@ import User from '../../models/Users/_UsersMain.mjs';
 import Initial from '../../models/initial/Initial.mjs';
 import { attachUser, requireRole } from '../../middlewares/Auth.mjs';
 import { USER_ROLE, USER_SOURCE, USER_STATUS } from '../../models/Users/_UsersMain.mjs';
+import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
 import { INITIAL_SOURCE, INITIAL_STATUS } from '../../models/initial/Initial.mjs';
 
 const router = express.Router();
 
 // POST /api/receptionist/walk-in
-router.post('/walk-in', attachUser, requireRole(USER_ROLE.RECEPTIONIST, USER_ROLE.ADMIN), async (req, res) => {
+router.post('/walk-in', attachUser, requireRole(STAFF_ROLE.RECEPTIONIST, STAFF_ROLE.ADMIN), async (req, res) => {
     try {
         const {
             email,

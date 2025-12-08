@@ -5,6 +5,7 @@ import Application from '../../models/Process/Process.mjs';
 import User from '../../models/Users/_UsersMain.mjs';
 import { attachUser, requireRole, requireVerifiedStaff } from '../../middlewares/Auth.mjs';
 import { USER_ROLE } from '../../models/Users/_UsersMain.mjs';
+import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
 import { INVOICE_STATUS, PAYMENT_METHOD } from '../../models/Inoice/Invoice.mjs';
 import { uploadSingle, deleteFile, replaceFile } from '../../middlewares/upload.mjs';
 
@@ -13,7 +14,7 @@ const router = express.Router();
 // All routes require accountant role and verified staff
 const requireAccountant = [
     attachUser,
-    requireRole(USER_ROLE.ACCOUNTANT, USER_ROLE.MANAGER, USER_ROLE.ADMIN),
+    requireRole(STAFF_ROLE.ACCOUNTANT, STAFF_ROLE.MANAGER, STAFF_ROLE.ADMIN),
     requireVerifiedStaff
 ];
 

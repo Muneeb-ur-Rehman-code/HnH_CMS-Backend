@@ -2,6 +2,8 @@
 import express from 'express';
 import User from '../../models/Users/_UsersMain.mjs';
 import { attachUser, requireAuth, requireEmailVerified, requirePasswordSet, requirePhoneVerified } from '../../middlewares/Auth.mjs';
+import StaffProfile from '../../models/Users/StaffProfile.mjs';
+import { USER_ROLE } from '../../models/Users/_UsersMain.mjs';
 import { generateToken } from '../../middlewares/jwt.mjs';
 
 const router = express.Router();
@@ -197,6 +199,25 @@ router.get('/status', attachUser, async (req, res) => {
             currentStep = 'basic-info';
         }
 
+        // If user is staff, fetch staff profile and attach staff role + verification
+        let staffInfo = null;
+        if (user.role === USER_ROLE.STAFF) {
+            try {
+                const staffProfile = await StaffProfile.findOne({ userId: user._id });
+                if (staffProfile) {
+                    staffInfo = {
+                        staffRole: staffProfile.staffRole || null,
+                        verificationStatus: staffProfile.verificationStatus || null,
+                        staffVerified: !!(staffProfile.verificationStatus === 'VERIFIED' || staffProfile.isVerified === true)
+                    };
+                } else {
+                    staffInfo = { staffProfileFound: false };
+                }
+            } catch (err) {
+                staffInfo = { error: 'Error fetching staff profile', details: err.message };
+            }
+        }
+
         return res.status(200).json({
             success: true,
             data: {
@@ -207,7 +228,8 @@ router.get('/status', attachUser, async (req, res) => {
                     firstName: user.firstName,
                     lastName: user.lastName,
                     phoneNumber: user.phone?.number,
-                    role: user.role
+                    role: user.role,
+                    staff: staffInfo
                 }
             }
         });

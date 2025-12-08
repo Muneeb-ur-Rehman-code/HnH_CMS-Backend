@@ -3,7 +3,7 @@ import { verifyToken } from './jwt.mjs';
 import User from '../models/Users/_UsersMain.mjs';
 import StaffProfile from '../models/Users/StaffProfile.mjs';
 import { USER_ROLE, USER_STATUS } from '../models/Users/_UsersMain.mjs';
-import { STAFF_VERIFICATION_STATUS } from '../models/Users/StaffProfile.mjs';
+import { STAFF_VERIFICATION_STATUS, STAFF_ROLE } from '../models/Users/StaffProfile.mjs';
 
 // ============================================
 // AUTHENTICATION MIDDLEWARES
@@ -121,7 +121,7 @@ export const requireAuth = (req, res, next) => {
  * @param {...string} roles - Allowed roles
  */
 export const requireRole = (...roles) => {
-    return (req, res, next) => {
+    return async (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({
                 success: false,
@@ -129,14 +129,61 @@ export const requireRole = (...roles) => {
             });
         }
 
-        if (!roles.includes(req.user.role)) {
-            return res.status(403).json({
-                success: false,
-                message: `Access denied. Required role: ${roles.join(' or ')}`
-            });
+        // Normalize and filter roles (remove falsy values)
+        const allowedRoles = roles.filter(Boolean);
+
+        // If the user's top-level role matches any allowed role, grant access
+        if (allowedRoles.includes(req.user.role)) {
+            return next();
         }
 
-        next();
+        // If the user is a staff member, allow checks against staff-specific roles
+        if (req.user.role === USER_ROLE.STAFF) {
+            try {
+                // Determine if any of the allowed roles are staff-level roles
+                const staffRoleValues = Object.values(STAFF_ROLE);
+                const requestedStaffRoles = allowedRoles.filter(r => staffRoleValues.includes(r));
+
+                // If no staff-level role was requested, deny access
+                if (requestedStaffRoles.length === 0) {
+                    return res.status(403).json({
+                        success: false,
+                        message: `Access denied. Required role: ${allowedRoles.join(' or ')}`
+                    });
+                }
+
+                // Use attached staffProfile if present, otherwise fetch it
+                const staffProfile = req.staffProfile || await StaffProfile.findOne({ userId: req.user._id });
+
+                if (!staffProfile) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Staff profile not found',
+                        code: 'STAFF_PROFILE_NOT_FOUND'
+                    });
+                }
+
+                // If the staff's role matches any of the requested staff roles, allow
+                if (requestedStaffRoles.includes(staffProfile.staffRole)) {
+                    // attach profile if not already
+                    if (!req.staffProfile) req.staffProfile = staffProfile;
+                    return next();
+                }
+
+                return res.status(403).json({
+                    success: false,
+                    message: `Access denied. Required role: ${allowedRoles.join(' or ')}`
+                });
+            } catch (err) {
+                return res.status(500).json({ success: false, message: 'Error checking staff role', error: err.message });
+            }
+        }
+
+        // Default deny
+        return res.status(403).json({
+            success: false,
+            message: `Access denied. Required role: ${allowedRoles.join(' or ')}`
+        });
     };
 };
 
@@ -150,19 +197,19 @@ export const requireStudent = requireRole(USER_ROLE.STUDENT);
  */
 export const requireStaff = requireRole(
     USER_ROLE.STAFF,
-    USER_ROLE.MANAGER,
-    USER_ROLE.ADMIN
+    STAFF_ROLE.MANAGER,
+    STAFF_ROLE.ADMIN
 );
 
 /**
  * Require manager role
  */
-export const requireManager = requireRole(USER_ROLE.MANAGER, USER_ROLE.ADMIN);
+export const requireManager = requireRole(STAFF_ROLE.MANAGER, STAFF_ROLE.ADMIN);
 
 /**
  * Require admin role
  */
-export const requireAdmin = requireRole(USER_ROLE.ADMIN);
+export const requireAdmin = requireRole(STAFF_ROLE.ADMIN);
 
 // ============================================
 // VERIFICATION CHECKS

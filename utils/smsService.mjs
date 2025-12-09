@@ -1,7 +1,7 @@
 // utils/smsService.mjs
 
 import { Vonage } from '@vonage/server-sdk';
-import {X, T, E, P } from "../config/constants.mjs"
+import { X, T, E, P } from "../config/constants.mjs"
 
 // ============================================
 // VONAGE CLIENT CONFIGURATION
@@ -40,6 +40,12 @@ const formatPhoneNumber = (phone) => {
 
 export const sendOTPviaSMS = async (phone, otp) => {
     const formattedPhone = formatPhoneNumber(phone);
+    // If running in development, do NOT send OTPs to external services.
+    if (process.env.NODE_ENV === 'development') {
+        console.log(P + `Development mode: skipping SMS OTP send to ${formattedPhone}. OTP: ${otp}`);
+        return { success: true, skipped: true, otp };
+    }
+
     console.log(P + `Sending SMS to ${formattedPhone} with OTP: ${otp}`);
 
     const message = `Your ${BRAND_NAME} verification code is: ${otp}. This code expires in 10 minutes. Do not share this code with anyone.`;
@@ -82,6 +88,12 @@ export const sendOTPviaSMS = async (phone, otp) => {
 
 export const sendOTPviaWhatsApp = async (phone, otp) => {
     const formattedPhone = formatPhoneNumber(phone);
+
+    // If running in development, do NOT send OTPs to external services.
+    if (process.env.NODE_ENV === 'development') {
+        console.log(P + `Development mode: skipping WhatsApp OTP send to ${formattedPhone}. OTP: ${otp}`);
+        return { success: true, skipped: true, otp };
+    }
 
     const message = `Your ${BRAND_NAME} verification code is: *${otp}*\n\nThis code expires in 10 minutes.\n\n_Do not share this code with anyone._`;
 

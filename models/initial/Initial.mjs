@@ -24,7 +24,6 @@ export const INITIAL_STATUS = Object.freeze({
 // ============================================
 const initialSchema = new Schema(
     {
-        // ---- Core Fields ----
         email: {
             type: String,
             required: [true, 'Email is required'],
@@ -80,7 +79,6 @@ const initialSchema = new Schema(
             }
         },
 
-        // ---- Preferences ----
         preferredCountry: {
             type: String,
             trim: true,
@@ -95,7 +93,6 @@ const initialSchema = new Schema(
             default: null
         },
 
-        // ---- Additional Notes (from marketing) ----
         notes: {
             type: String,
             trim: true,
@@ -103,7 +100,6 @@ const initialSchema = new Schema(
             default: null
         },
 
-        // ---- Source & Status ----
         source: {
             type: String,
             enum: {
@@ -124,7 +120,6 @@ const initialSchema = new Schema(
             index: true
         },
 
-        // ---- Link to User (if registered) ----
         userId: {
             type: Schema.Types.ObjectId,
             ref: 'User',
@@ -132,7 +127,6 @@ const initialSchema = new Schema(
             index: true
         },
 
-        // ---- Approval/Rejection Info ----
         reviewedBy: {
             type: Schema.Types.ObjectId,
             ref: 'User',
@@ -151,7 +145,6 @@ const initialSchema = new Schema(
             default: null
         },
 
-        // ---- Done Info (when application is created) ----
         markedDoneBy: {
             type: Schema.Types.ObjectId,
             ref: 'User',
@@ -163,16 +156,12 @@ const initialSchema = new Schema(
             default: null
         },
 
-        // ---- Soft Delete ----
         deletedAt: {
             type: Date,
             default: null,
             index: true
         }
-    },
-    {
-        timestamps: true
-    }
+    },{ timestamps: true }
 );
 
 // ============================================
@@ -223,12 +212,6 @@ initialSchema.virtual('isDeleted').get(function () {
 // ============================================
 // INSTANCE METHODS
 // ============================================
-
-/**
- * Approve the initial record
- * @param {ObjectId} reviewerId - ID of user approving
- * @returns {Promise<Initial>}
- */
 initialSchema.methods.approve = function (reviewerId) {
     if (this.status !== INITIAL_STATUS.PENDING) {
         throw new Error(`Cannot approve record with status: ${this.status}`);
@@ -242,12 +225,6 @@ initialSchema.methods.approve = function (reviewerId) {
     return this.save();
 };
 
-/**
- * Reject the initial record
- * @param {ObjectId} reviewerId - ID of user rejecting
- * @param {string} reason - Rejection reason
- * @returns {Promise<Initial>}
- */
 initialSchema.methods.reject = function (reviewerId, reason) {
     if (this.status !== INITIAL_STATUS.PENDING) {
         throw new Error(`Cannot reject record with status: ${this.status}`);
@@ -265,11 +242,6 @@ initialSchema.methods.reject = function (reviewerId, reason) {
     return this.save();
 };
 
-/**
- * Mark as done (when application is created)
- * @param {ObjectId} consultantId - ID of consultant who created application
- * @returns {Promise<Initial>}
- */
 initialSchema.methods.markAsDone = function (consultantId) {
     if (this.status !== INITIAL_STATUS.APPROVED) {
         throw new Error('Only approved records can be marked as done');
@@ -282,10 +254,6 @@ initialSchema.methods.markAsDone = function (consultantId) {
     return this.save();
 };
 
-/**
- * Reset to pending status
- * @returns {Promise<Initial>}
- */
 initialSchema.methods.resetToPending = function () {
     this.status = INITIAL_STATUS.PENDING;
     this.reviewedBy = null;
@@ -297,29 +265,16 @@ initialSchema.methods.resetToPending = function () {
     return this.save();
 };
 
-/**
- * Link to user
- * @param {ObjectId} userId
- * @returns {Promise<Initial>}
- */
 initialSchema.methods.linkToUser = function (userId) {
     this.userId = userId;
     return this.save();
 };
 
-/**
- * Soft delete the record
- * @returns {Promise<Initial>}
- */
 initialSchema.methods.softDelete = function () {
     this.deletedAt = new Date();
     return this.save();
 };
 
-/**
- * Restore soft deleted record
- * @returns {Promise<Initial>}
- */
 initialSchema.methods.restore = function () {
     this.deletedAt = null;
     return this.save();
@@ -329,20 +284,11 @@ initialSchema.methods.restore = function () {
 // STATIC METHODS
 // ============================================
 
-/**
- * Find by email
- * @param {string} email
- * @returns {Promise<Initial>}
- */
+
 initialSchema.statics.findByEmail = function (email) {
     return this.findOne({ email: email.toLowerCase() });
 };
 
-/**
- * Find active (non-DONE) record by email
- * @param {string} email
- * @returns {Promise<Initial>}
- */
 initialSchema.statics.findActiveByEmail = function (email) {
     return this.findOne({
         email: email.toLowerCase(),
@@ -350,19 +296,10 @@ initialSchema.statics.findActiveByEmail = function (email) {
     });
 };
 
-/**
- * Find pending records
- * @returns {Promise<Initial[]>}
- */
 initialSchema.statics.findPending = function () {
     return this.find({ status: INITIAL_STATUS.PENDING }).sort({ createdAt: -1 });
 };
 
-/**
- * Find approved records
- * @param {string} country - Optional country filter
- * @returns {Promise<Initial[]>}
- */
 initialSchema.statics.findApproved = function (country = null) {
     const query = { status: INITIAL_STATUS.APPROVED };
     if (country) {
@@ -371,11 +308,6 @@ initialSchema.statics.findApproved = function (country = null) {
     return this.find(query).sort({ createdAt: -1 });
 };
 
-/**
- * Find approved records for countries
- * @param {Array} countries - Array of country names
- * @returns {Promise<Initial[]>}
- */
 initialSchema.statics.findApprovedForCountries = function (countries) {
     return this.find({
         status: INITIAL_STATUS.APPROVED,
@@ -383,20 +315,10 @@ initialSchema.statics.findApprovedForCountries = function (countries) {
     }).sort({ createdAt: -1 });
 };
 
-/**
- * Find by user ID
- * @param {ObjectId} userId
- * @returns {Promise<Initial[]>}
- */
 initialSchema.statics.findByUserId = function (userId) {
     return this.find({ userId }).sort({ createdAt: -1 });
 };
 
-/**
- * Check if user has active initial record
- * @param {string} email
- * @returns {Promise<boolean>}
- */
 initialSchema.statics.hasActiveRecord = async function (email) {
     const count = await this.countDocuments({
         email: email.toLowerCase(),
@@ -405,11 +327,6 @@ initialSchema.statics.hasActiveRecord = async function (email) {
     return count > 0;
 };
 
-/**
- * Check if DONE record exists (prevents marketing duplicates)
- * @param {string} email
- * @returns {Promise<boolean>}
- */
 initialSchema.statics.hasDoneRecord = async function (email) {
     const count = await this.countDocuments({
         email: email.toLowerCase(),
@@ -418,11 +335,6 @@ initialSchema.statics.hasDoneRecord = async function (email) {
     return count > 0;
 };
 
-/**
- * Create from marketing import
- * @param {Object} data
- * @returns {Promise<Initial>}
- */
 initialSchema.statics.createFromMarketing = async function (data) {
     const { email, firstName, lastName, phoneNumber, preferredCountry, preferredUniversity, notes } =
         data;
@@ -452,11 +364,6 @@ initialSchema.statics.createFromMarketing = async function (data) {
     });
 };
 
-/**
- * Create from walk-in
- * @param {Object} data
- * @returns {Promise<Initial>}
- */
 initialSchema.statics.createFromWalkIn = async function (data) {
     const { email, firstName, lastName, phoneNumber, preferredCountry, preferredUniversity } = data;
 
@@ -481,12 +388,6 @@ initialSchema.statics.createFromWalkIn = async function (data) {
     });
 };
 
-/**
- * Create from online (student submission)
- * @param {ObjectId} userId
- * @param {Object} data
- * @returns {Promise<Initial>}
- */
 initialSchema.statics.createFromOnline = async function (userId, data) {
     const { email, firstName, lastName, phoneNumber, preferredCountry, preferredUniversity } = data;
 
@@ -512,11 +413,6 @@ initialSchema.statics.createFromOnline = async function (userId, data) {
     });
 };
 
-/**
- * Import from Google Sheets
- * @param {Array} records - Array of records from sheet
- * @returns {Promise<Object>} - Summary of import
- */
 initialSchema.statics.importFromSheets = async function (records) {
     const summary = {
         total: records.length,
@@ -570,5 +466,6 @@ initialSchema.set('toObject', { virtuals: true });
 // ============================================
 // EXPORT
 // ============================================
+
 const Initial = model('Initial', initialSchema);
 export default Initial;

@@ -8,6 +8,7 @@ const { Schema, model } = mongoose;
 // ============================================
 // ENUMS
 // ============================================
+
 export const USER_ROLE = Object.freeze({
     STUDENT: 'STUDENT',
     STAFF: 'STAFF'
@@ -226,10 +227,7 @@ const userSchema = new Schema(
             default: null,
             index: true
         }
-    },
-    {
-        timestamps: true
-    }
+    }, { timestamps: true }
 );
 
 userSchema.index({ email: 1, deletedAt: 1 });
@@ -332,7 +330,7 @@ userSchema.statics.generateOtp = function () {
     else {
         const code = crypto.randomInt(100000, 999999).toString();
     }
-    
+
     const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
     const expiresAt = new Date(Date.now() + OTP_CONFIG.EXPIRY_MINUTES * 60 * 1000);
 
@@ -502,7 +500,7 @@ userSchema.methods.setPhoneAndGenerateOtp = async function (phoneNumber) {
     const now = new Date();
 
     // Check cooldown if same number
-    if (user.phone?.number === phoneNumber && user.phone?.otp?.lastSentAt) {
+    if (user.phone?.otp?.lastSentAt) {
         const cooldownEnd = new Date(
             user.phone.otp.lastSentAt.getTime() + OTP_CONFIG.COOLDOWN_MINUTES * 60 * 1000
         );

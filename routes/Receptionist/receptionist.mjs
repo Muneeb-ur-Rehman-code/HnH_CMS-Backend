@@ -40,7 +40,7 @@ router.post('/walk-in', attachUser, requireRole(STAFF_ROLE.RECEPTIONIST, STAFF_R
                 email: normalizedEmail,
                 firstName,
                 lastName,
-                phone: { number: phoneNumber || null, otp: { verified: true } },
+                phone: phoneNumber ? { number: phoneNumber || null, otp: { verified: true } } : null,
                 role: USER_ROLE.STUDENT,
                 source: USER_SOURCE.WALK_IN,
                 status: USER_STATUS.ACTIVE
@@ -67,14 +67,12 @@ router.post('/walk-in', attachUser, requireRole(STAFF_ROLE.RECEPTIONIST, STAFF_R
             await user.save();
         }
 
-        // Create or update Initial entry
         let initial = await Initial.findOne({
             email: normalizedEmail,
-            status: { $ne: INITIAL_STATUS.DONE }
+            status: { $ne: INITIAL_STATUS.APPROVED }
         });
 
         if (initial) {
-            // Update existing initial entry
             initial.firstName = firstName;
             initial.lastName = lastName;
             initial.phoneNumber = phoneNumber || null;
@@ -82,9 +80,9 @@ router.post('/walk-in', attachUser, requireRole(STAFF_ROLE.RECEPTIONIST, STAFF_R
             initial.preferredUniversity = preferredUniversity || null;
             initial.source = INITIAL_SOURCE.WALK_IN;
             initial.status = INITIAL_STATUS.APPROVED;
+            initial.userId = user._id;
             await initial.save();
         } else {
-            // Create new initial entry
             initial = await Initial.create({
                 email: normalizedEmail,
                 firstName,
@@ -93,7 +91,8 @@ router.post('/walk-in', attachUser, requireRole(STAFF_ROLE.RECEPTIONIST, STAFF_R
                 preferredCountry: preferredCountry || null,
                 preferredUniversity: preferredUniversity || null,
                 source: INITIAL_SOURCE.WALK_IN,
-                status: INITIAL_STATUS.APPROVED
+                status: INITIAL_STATUS.APPROVED,
+                userId: user._id
             });
         }
 

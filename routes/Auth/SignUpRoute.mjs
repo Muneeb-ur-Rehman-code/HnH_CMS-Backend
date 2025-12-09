@@ -5,6 +5,7 @@ import { sendOTPEmail } from '../../utils/emailService.mjs';
 import { sendOTPviaSMS } from '../../utils/smsService.mjs';
 import { optionalAttachUser } from '../../middlewares/Auth.mjs';
 import { generateToken, verifyToken } from '../../middlewares/jwt.mjs';
+import { attachUser } from '../../middlewares/Auth.mjs';
 
 const router = express.Router();
 
@@ -583,6 +584,38 @@ router.post('/resend-phone-otp', async (req, res) => {
             message: 'Failed to resend OTP',
             error: error.message
         });
+    }
+});
+
+// /api/auth/signup/del-phone
+router.delete('/del-phone', attachUser, async (req, res) => {
+    try {
+        const user = req.user;
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized'
+            });
+        }
+
+        if (!user.phone.number) {
+            return res.status(400).json({
+                success: false,
+                message: 'Phone number not set'
+            });
+        }
+
+        user.phone.number = null;
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: 'Phone number deleted successfully'
+        });
+
+    }
+    catch (error) {
+
     }
 });
 

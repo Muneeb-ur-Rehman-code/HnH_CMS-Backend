@@ -326,7 +326,13 @@ userSchema.statics.hashPassword = async function (password) {
 };
 
 userSchema.statics.generateOtp = function () {
-    const code = crypto.randomInt(100000, 999999).toString();
+    if (NODE_ENV === development) {
+        const code = 111111;
+    }
+    else {
+        const code = crypto.randomInt(100000, 999999).toString();
+    }
+    
     const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
     const expiresAt = new Date(Date.now() + OTP_CONFIG.EXPIRY_MINUTES * 60 * 1000);
 

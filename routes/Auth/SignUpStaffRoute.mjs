@@ -269,8 +269,8 @@ router.get('/status', async (req, res) => {
                     exists: true,
                     hasPassword: true,
                     emailVerified: reg.isEmailVerified,
-                    phoneNumber: reg.phoneNumber ? true : false,
-                    phoneVerified: reg.isPhoneVerified,
+                    // phoneNumber: reg.phoneNumber ? true : false,
+                    // phoneVerified: reg.isPhoneVerified,
                     staffRole: staffProfile?.staffRole || null,
                     verificationStatus: staffProfile?.verificationStatus || null,
                     message: staffProfile?.verificationStatus === STAFF_VERIFICATION_STATUS.VERIFIED
@@ -286,8 +286,8 @@ router.get('/status', async (req, res) => {
                 exists: true,
                 hasPassword: false,
                 emailVerified: reg.isEmailVerified,
-                phoneNumber: reg.phoneNumber ? true : false,
-                phoneVerified: reg.isPhoneVerified,
+                // phoneNumber: reg.phoneNumber ? true : false,
+                // phoneVerified: reg.isPhoneVerified,
                 staffRole: staffProfile?.staffRole || null,
                 verificationStatus: staffProfile?.verificationStatus || null,
                 currentStep: reg.currentStep

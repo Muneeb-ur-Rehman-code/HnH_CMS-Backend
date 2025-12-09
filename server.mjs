@@ -44,9 +44,10 @@ app.get(['/', '/health', '/health-check'], (req, res) => { res.json({ message: '
 
 //
 
-//====================================================BUILD FOLDER SERVE
+//====================================================RUN SAMPLE SEED (DEVELOPMENT ONLY)
 
 app.get('/run-sample-seed', async (req, res) => {
+    if(process.env.NODE_ENV !== 'development') return res.status(403).send(X + 'Forbidden');
     try {
         await seedDatabase();
     } catch (e) {
@@ -67,7 +68,7 @@ app.use((err, req, res, next) => {
     console.error('Server error:', err);
     res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: 'Internal server error (wee woo waa whops!!)',
         error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
 });

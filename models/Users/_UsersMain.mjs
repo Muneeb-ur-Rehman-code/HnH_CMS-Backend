@@ -634,7 +634,7 @@ userSchema.methods.getRegistrationStatus = async function () {
         email: user.email,
         isEmailVerified,
         hasPassword: hasPasswordSet,
-        hasPhone,
+        // hasPhone,
         // phoneNumber: user.phone?.number || null,
         // isPhoneVerified,
         isProfileComplete,

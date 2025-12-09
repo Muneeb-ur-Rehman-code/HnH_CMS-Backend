@@ -1,8 +1,9 @@
 // routes/auth/login.mjs
 import express from 'express';
 import User from '../../models/Users/_UsersMain.mjs';
+import StaffProfile from '../../models/Users/StaffProfile.mjs';
 import { generateToken } from '../../middlewares/jwt.mjs';
-import { USER_STATUS } from '../../models/Users/_UsersMain.mjs';
+import { USER_STATUS, USER_ROLE } from '../../models/Users/_UsersMain.mjs';
 
 const router = express.Router();
 
@@ -92,11 +93,26 @@ router.post('/login', async (req, res) => {
             source: user.source
         };
 
+        // Fetch staff profile if user is a staff member
+        let staffData = null;
+        if (user.role === USER_ROLE.STAFF) {
+            const staffProfile = await StaffProfile.findByUserId(user._id);
+            if (staffProfile) {
+                staffData = {
+                    id: staffProfile._id,
+                    staffRole: staffProfile.staffRole,
+                    verificationStatus: staffProfile.verificationStatus,
+                    isVerified: staffProfile.isVerified,
+                };
+            }
+        }
+
         return res.status(200).json({
             success: true,
             message: 'Login successful',
             data: {
                 user: userData,
+                staff: staffData,
                 token
             }
         });

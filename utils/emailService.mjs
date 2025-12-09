@@ -120,6 +120,13 @@ const sendMail = async ({ to, subject, html }) => {
 // ============================================
 
 export const sendOTPEmail = async (email, otp) => {
+    // In development do not actually send the email; log and return a simulated response
+    if (process.env.NODE_ENV === 'development') {
+        const devContent = `Development mode: OTP for ${email} is ${otp}`;
+        console.log(T + devContent);
+        return { success: true, skipped: true, otp };
+    }
+
     const content = `
     <div style="text-align: center;">
       <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 600;">Verification Code</h1>

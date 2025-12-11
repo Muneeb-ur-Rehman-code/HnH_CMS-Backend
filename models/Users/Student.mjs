@@ -194,14 +194,9 @@ const studentProfileSchema = new Schema(
         englishProficiency: {
             type: englishProficiencySchema,
             default: () => ({})
-        },
-
-        // ---- Soft Delete ----
-        deletedAt: {
-            type: Date,
-            default: null,
-            index: true
         }
+
+
     },
     {
         timestamps: true
@@ -213,16 +208,6 @@ const studentProfileSchema = new Schema(
 // ============================================
 studentProfileSchema.index({ passportNumber: 1 }, { sparse: true });
 studentProfileSchema.index({ nationality: 1 });
-
-// ============================================
-// QUERY MIDDLEWARE - Exclude soft deleted
-// ============================================
-studentProfileSchema.pre(/^find/, function () {
-    if (this.getOptions().includeSoftDeleted !== true) {
-        this.where({ deletedAt: null });
-    }
-    // next();
-});
 
 // ============================================
 // VIRTUALS
@@ -245,10 +230,6 @@ studentProfileSchema.virtual('hasCompleteAddress').get(function () {
         this.address?.city &&
         this.address?.country
     );
-});
-
-studentProfileSchema.virtual('isDeleted').get(function () {
-    return this.deletedAt !== null;
 });
 
 studentProfileSchema.virtual('user', {
@@ -347,24 +328,6 @@ studentProfileSchema.methods.getCompletionPercentage = function () {
 
     const filledFields = fields.filter(Boolean).length;
     return Math.round((filledFields / fields.length) * 100);
-};
-
-/**
- * Soft delete profile
- * @returns {Promise<StudentProfile>}
- */
-studentProfileSchema.methods.softDelete = function () {
-    this.deletedAt = new Date();
-    return this.save();
-};
-
-/**
- * Restore soft deleted profile
- * @returns {Promise<StudentProfile>}
- */
-studentProfileSchema.methods.restore = function () {
-    this.deletedAt = null;
-    return this.save();
 };
 
 // ============================================

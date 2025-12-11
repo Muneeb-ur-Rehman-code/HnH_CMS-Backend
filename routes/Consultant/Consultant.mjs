@@ -3,7 +3,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import User from '../../models/Users/_UsersMain.mjs';
 import StaffProfile from '../../models/Users/StaffProfile.mjs';
-import ConsultantCountry from '../../models/Users/ConsultantCountry.mjs';
+import Country from '../../models/Country/CountryModel.mjs';
 import StudentProfile from '../../models/Users/Student.mjs';
 import Initial from '../../models/initial/Initial.mjs';
 import Application from '../../models/Process/Process.mjs';
@@ -41,11 +41,8 @@ const requireConsultant = [
 
 // Helper to get consultant's assigned countries
 async function getConsultantCountries(staffProfileId) {
-    const assignments = await ConsultantCountry.find({
-        staffProfileId,
-        deletedAt: null
-    });
-    return assignments.map(a => a.country);
+    const countries = await Country.getCountriesByConsultant(staffProfileId);
+    return countries.map(c => c.name);
 }
 
 // ============================================

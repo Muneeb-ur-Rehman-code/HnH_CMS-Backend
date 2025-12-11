@@ -28,24 +28,10 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        if (user.isDeleted) {
-            return res.status(403).json({
-                success: false,
-                message: 'Account has been deleted. Please contact administrator.'
-            });
-        }
-
         if (user.status === USER_STATUS.SUSPENDED) {
             return res.status(403).json({
                 success: false,
                 message: 'Account is suspended. Please contact administrator.'
-            });
-        }
-
-        if (user.status === USER_STATUS.INACTIVE) {
-            return res.status(403).json({
-                success: false,
-                message: 'Account is inactive. Please contact administrator.'
             });
         }
 

@@ -134,11 +134,11 @@ router.post('/verify-email-otp', async (req, res) => {
             staffProfile = await StaffProfile.create({
                 userId: user._id,
                 staffRole,
-                verificationStatus: STAFF_VERIFICATION_STATUS.UNVERIFIED
+                verificationStatus: STAFF_VERIFICATION_STATUS.PENDING
             });
         } else {
             staffProfile.staffRole = staffRole;
-            staffProfile.verificationStatus = STAFF_VERIFICATION_STATUS.UNVERIFIED;
+            staffProfile.verificationStatus = STAFF_VERIFICATION_STATUS.PENDING;
             await staffProfile.save();
         }
 
@@ -151,7 +151,7 @@ router.post('/verify-email-otp', async (req, res) => {
                 email: normalizedEmail,
                 emailVerified: true,
                 staffRole,
-                verificationStatus: STAFF_VERIFICATION_STATUS.UNVERIFIED,
+                verificationStatus: STAFF_VERIFICATION_STATUS.PENDING,
                 token
             }
         });

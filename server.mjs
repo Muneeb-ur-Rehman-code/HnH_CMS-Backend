@@ -6,6 +6,12 @@ import cors from 'cors';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
+//====================================================DEVELOPMENT THINGS
+
+import swaggerUi from 'swagger-ui-express';
+import swaggerDocument from './swagger-output.json' with { type: "json" };
+import seedDatabase from './seeds/seeder-Sample.mjs';
+
 //====================================================FILES IMPORTS
 
 import connectDB from './config/db.mjs';
@@ -16,7 +22,6 @@ import { verifySMSConnection } from './utils/smsService.mjs';
 // import { sendNotificationEmail } from './utils/emailService.mjs';
 // import { sendOTPviaSMS } from './utils/smsService.mjs';
 import routes from "./routes/Routes.mjs"
-import seedDatabase from './seeds/seeder-Sample.mjs';
 
 //====================================================INITIALIZATION
 
@@ -31,6 +36,10 @@ app.use(cors());
 app.use(express.json());
 app.use(logger(false));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+//====================================================Development api docs
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 //====================================================API ROUTES
 
@@ -47,7 +56,7 @@ app.get(['/', '/health', '/health-check'], (req, res) => { res.json({ message: '
 //====================================================RUN SAMPLE SEED (DEVELOPMENT ONLY)
 
 app.get('/run-sample-seed', async (req, res) => {
-    if(process.env.NODE_ENV !== 'development') return res.status(403).send(X + 'Forbidden');
+    if (process.env.NODE_ENV !== 'development') return res.status(403).send(X + 'Forbidden');
     try {
         await seedDatabase();
     } catch (e) {

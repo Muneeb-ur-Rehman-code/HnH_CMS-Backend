@@ -9,7 +9,7 @@ import bcrypt from 'bcryptjs';
 
 import User from '../models/Users/_UsersMain.mjs';
 import StaffProfile from '../models/Users/StaffProfile.mjs';
-import ConsultantCountry from '../models/Users/ConsultantCountry.mjs';
+import Country from '../models/Country/CountryModel.mjs';
 import StudentProfile from '../models/Users/Student.mjs';
 import Initial from '../models/initial/Initial.mjs';
 import Application from '../models/Process/Process.mjs';
@@ -37,6 +37,7 @@ const __dirname = dirname(__filename);
 const createdData = {
     users: {},
     staffProfiles: {},
+    countries: {},
     studentProfiles: [],
     application: null,
     invoice: null,
@@ -182,24 +183,45 @@ async function seedUsersAndProfiles() {
     success(`Created ${staffRoles.length * 2} staff users and 2 student users.`);
 }
 
-async function seedConsultantCountries() {
-    progress('Seeding consultant countries...');
+// async function seedCountries() {
+//     progress('Seeding countries...');
+
+//     const countryData = [
+//         { name: 'United Kingdom', code: 'GBR' },
+//         { name: 'Canada', code: 'CAN' }
+//     ];
+
+//     for (const data of countryData) {
+//         const country = await Country.createCountry(data);
+//         createdData.countries[data.name] = country;
+//     }
+
+//     success(`Created ${countryData.length} countries.`);
+// }
+
+async function seedCountries() {
+    progress('Seeding countries...');
     const consultantProfiles = createdData.staffProfiles[STAFF_ROLE.CONSULTANT];
 
-    if (consultantProfiles && consultantProfiles.length > 0) {
-        for (const consultantProfile of consultantProfiles) {
-            await ConsultantCountry.create({
-                staffProfileId: consultantProfile._id,
-                country: 'United Kingdom'
-            });
-
-            await ConsultantCountry.create({
-                staffProfileId: consultantProfile._id,
-                country: 'Canada'
-            });
-        }
-        success(`Assigned countries to ${consultantProfiles.length} consultants.`);
+    if (!consultantProfiles || consultantProfiles.length === 0) {
+        error('No consultant profiles found. Skipping country seeding.');
+        return;
     }
+
+    const countriesToCreate = [
+        { name: 'United Kingdom', code: 'GBR' },
+        { name: 'Canada', code: 'CAN' }
+    ];
+
+    for (const countryData of countriesToCreate) {
+        const createdCountry = await Country.createCountry({
+            ...countryData,
+            consultantId: consultantProfiles[0]._id
+        });
+        createdData.countries[countryData.name] = createdCountry;
+    }
+
+    success(`Created ${countriesToCreate.length} countries assigned to consultants.`);
 }
 
 async function seedApplication() {
@@ -405,7 +427,7 @@ async function seedDatabase({ exitOnFinish = false } = {}) {
         // Delete related data
         await Promise.all([
             StaffProfile.deleteMany({}),
-            ConsultantCountry.deleteMany({}),
+            Country.deleteMany({}),
             StudentProfile.deleteMany({}),
             Initial.deleteMany({}),
             Application.deleteMany({}),
@@ -417,7 +439,7 @@ async function seedDatabase({ exitOnFinish = false } = {}) {
 
         // Seed data
         await seedUsersAndProfiles();
-        await seedConsultantCountries();
+        await seedCountries();
 
 
         console.log('\n' + '='.repeat(60));

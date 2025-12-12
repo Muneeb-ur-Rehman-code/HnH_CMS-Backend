@@ -5,10 +5,6 @@ import crypto from 'crypto';
 
 const { Schema, model } = mongoose;
 
-// ============================================
-// ENUMS
-// ============================================
-
 export const USER_ROLE = Object.freeze({
     STUDENT: 'STUDENT',
     STAFF: 'STAFF'
@@ -16,7 +12,6 @@ export const USER_ROLE = Object.freeze({
 
 export const USER_STATUS = Object.freeze({
     ACTIVE: 'ACTIVE',
-    INACTIVE: 'INACTIVE',
     SUSPENDED: 'SUSPENDED'
 });
 
@@ -26,11 +21,7 @@ export const USER_SOURCE = Object.freeze({
     CONSULTANT: 'CONSULTANT'
 });
 
-// ============================================
-// CONSTANTS
-// ============================================
 const OTP_CONFIG = {
-    LENGTH: 6,
     EXPIRY_MINUTES: 10,
     MAX_ATTEMPTS: 5,
     COOLDOWN_MINUTES: 2
@@ -41,9 +32,6 @@ const PASSWORD_CONFIG = {
     SALT_ROUNDS: 12
 };
 
-// ============================================
-// SUB-SCHEMAS
-// ============================================
 const otpSchema = new Schema(
     {
         code: {
@@ -97,11 +85,18 @@ const phoneSchema = new Schema(
     { _id: false }
 );
 
-// ============================================
-// MAIN SCHEMA
-// ============================================
+
+
+
+
+
 const userSchema = new Schema(
     {
+
+
+
+
+
         email: {
             type: String,
             required: [true, 'Email is required'],
@@ -117,22 +112,39 @@ const userSchema = new Schema(
             index: true
         },
 
-        password: {
-            type: String,
-            default: null,
-            select: false
-        },
-
         emailOtp: {
             type: otpSchema,
             default: () => ({}),
             select: false
         },
 
+
+
+
+
+
+        password: {
+            type: String,
+            default: null,
+            select: false
+        },
+
+
+
+
+
+
+
         phone: {
             type: phoneSchema,
             default: () => ({})
         },
+
+
+
+
+
+
 
         firstName: {
             type: String,
@@ -188,6 +200,12 @@ const userSchema = new Schema(
             default: null
         },
 
+
+
+
+
+
+
         role: {
             type: String,
             enum: {
@@ -220,79 +238,37 @@ const userSchema = new Schema(
         lastLoginAt: {
             type: Date,
             default: null
-        },
-
-        deletedAt: {
-            type: Date,
-            default: null,
-            index: true
         }
+
+
     }, { timestamps: true }
 );
 
-userSchema.index({ email: 1, deletedAt: 1 });
+userSchema.index({ email: 1 });
 userSchema.index({ role: 1, status: 1 });
 userSchema.index({ createdAt: -1 });
 
-// ============================================
-// QUERY MIDDLEWARE - Exclude soft deleted
-// ============================================
-userSchema.pre(/^find/, function () {
-    if (this.getOptions().includeSoftDeleted !== true) {
-        this.where({ deletedAt: null });
-    }
-    // next();
-});
-
-
-// ============================================
-// VIRTUALS
-// ============================================
-userSchema.virtual('fullName').get(function () {
-    // Return a display name based on first name only
-    if (!this.firstName) return null;
-    return this.firstName;
-});
-
-userSchema.virtual('isEmailVerified').get(function () {
-    return this.emailOtp?.verified === true;
-});
-
-userSchema.virtual('isPhoneVerified').get(function () {
-    return this.phone?.otp?.verified === true;
-});
-
-userSchema.virtual('hasPassword').get(function () {
-    return !!this.password;
-});
-
-userSchema.virtual('isDeleted').get(function () {
-    return this.deletedAt !== null;
-});
-
-userSchema.virtual('isProfileComplete').get(function () {
-    return !!(this.firstName);
-});
-
-userSchema.virtual('studentProfile', {
-    ref: 'StudentProfile',
-    localField: '_id',
-    foreignField: 'userId',
-    justOne: true
-});
-
-userSchema.virtual('staffProfile', {
-    ref: 'StaffProfile',
-    localField: '_id',
-    foreignField: 'userId',
-    justOne: true
-});
 
 
 
-// ============================================
-// STATIC METHODS - Password Utilities
-// ============================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 userSchema.statics.validatePasswordStrength = function (password) {
     const errors = [];
@@ -324,13 +300,7 @@ userSchema.statics.hashPassword = async function (password) {
 };
 
 userSchema.statics.generateOtp = function () {
-    if (NODE_ENV === development) {
-        const code = 111111;
-    }
-    else {
-        const code = crypto.randomInt(100000, 999999).toString();
-    }
-
+    const code = process.env.NODE_ENV === 'development' ? '111111' : crypto.randomInt(100000, 999999).toString();
     const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
     const expiresAt = new Date(Date.now() + OTP_CONFIG.EXPIRY_MINUTES * 60 * 1000);
 
@@ -341,17 +311,17 @@ userSchema.statics.hashOtp = function (code) {
     return crypto.createHash('sha256').update(code).digest('hex');
 };
 
-userSchema.statics.findByEmailWithSensitive = function (email) {
-    return this.findOne({ email: email.toLowerCase() }).select('+password +emailOtp');
-};
 
-userSchema.statics.findByEmailIncludingDeleted = function (email) {
-    return this.findOne({ email: email.toLowerCase() }).setOptions({ includeSoftDeleted: true });
-};
 
-// ============================================
-// INSTANCE METHODS - Password Operations
-// ============================================
+
+
+
+
+
+
+
+
+
 
 userSchema.methods.setPassword = async function (password) {
     const validation = this.constructor.validatePasswordStrength(password);
@@ -393,9 +363,15 @@ userSchema.methods.resetPassword = async function (newPassword) {
     return user.setPassword(newPassword);
 };
 
-// ============================================
-// INSTANCE METHODS - Email OTP Operations
-// ============================================
+
+
+
+
+
+
+
+
+
 
 userSchema.methods.generateEmailOtp = async function () {
     // Fetch fresh user data with email OTP
@@ -485,9 +461,7 @@ userSchema.methods.getEmailOtpCooldownRemaining = async function () {
     return Math.ceil((cooldownEnd - now) / 1000);
 };
 
-// ============================================
-// INSTANCE METHODS - Phone OTP Operations
-// ============================================
+
 
 userSchema.methods.setPhoneAndGenerateOtp = async function (phoneNumber) {
     // Validate format
@@ -596,9 +570,8 @@ userSchema.methods.getPhoneOtpCooldownRemaining = async function () {
     return Math.ceil((cooldownEnd - now) / 1000);
 };
 
-// ============================================
-// INSTANCE METHODS - Status Operations
-// ============================================
+
+
 
 userSchema.methods.getRegistrationStatus = async function () {
     // Fetch fresh user data including hidden fields
@@ -606,8 +579,6 @@ userSchema.methods.getRegistrationStatus = async function () {
 
     const hasPasswordSet = !!user.password;
     const isEmailVerified = user.emailOtp?.verified === true;
-    // const isPhoneVerified = user.phone?.otp?.verified === true;
-    // const hasPhone = user.phone?.number !== null;
     const isProfileComplete = !!(user.firstName);
 
     // Determine current step
@@ -620,12 +591,6 @@ userSchema.methods.getRegistrationStatus = async function () {
     } else if (!hasPasswordSet) {
         currentStep = 'SET_PASSWORD';
         message = 'Please set your password';
-        // } else if (!hasPhone) {
-        // currentStep = 'ADD_PHONE';
-        // message = 'Please add your phone number';
-        // } else if (!isPhoneVerified) {
-        // currentStep = 'PHONE_VERIFICATION';
-        // message = 'Please verify your phone number';
     } else if (!isProfileComplete) {
         currentStep = 'COMPLETE_PROFILE';
         message = 'Please complete your profile';
@@ -638,9 +603,6 @@ userSchema.methods.getRegistrationStatus = async function () {
         email: user.email,
         isEmailVerified,
         hasPassword: hasPasswordSet,
-        // hasPhone,
-        // phoneNumber: user.phone?.number || null,
-        // isPhoneVerified,
         isProfileComplete,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -651,9 +613,9 @@ userSchema.methods.getRegistrationStatus = async function () {
     };
 };
 
-// ============================================
-// ASYNC HELPERS (fetch hidden fields when needed)
-// ============================================
+
+
+
 
 userSchema.methods.hasPasswordAsync = async function () {
     const user = await this.constructor.findById(this._id).select('+password');
@@ -670,15 +632,15 @@ userSchema.methods.isPhoneVerifiedAsync = async function () {
     return user.phone?.otp?.verified === true;
 };
 
-userSchema.methods.getFullNameAsync = async function () {
-    const user = await this.constructor.findById(this._id);
-    return user.firstName || null;
-};
 
-userSchema.methods.isProfileCompleteAsync = async function () {
-    const user = await this.constructor.findById(this._id);
-    return !!(user.firstName);
-};
+
+
+
+
+
+
+
+
 
 userSchema.methods.updateLastLogin = function () {
     this.lastLoginAt = new Date();
@@ -695,34 +657,11 @@ userSchema.methods.activate = function () {
     return this.save();
 };
 
-userSchema.methods.deactivate = function () {
-    this.status = USER_STATUS.INACTIVE;
-    return this.save();
-};
 
-userSchema.methods.softDelete = function () {
-    this.deletedAt = new Date();
-    this.status = USER_STATUS.INACTIVE;
-    return this.save();
-};
 
-userSchema.methods.restore = function () {
-    this.deletedAt = null;
-    this.status = USER_STATUS.ACTIVE;
-    return this.save();
-};
 
-userSchema.methods.convertToStudent = function () {
-    if (this.role === USER_ROLE.STUDENT) {
-        throw new Error('User is already a student');
-    }
-    this.role = USER_ROLE.STUDENT;
-    return this.save();
-};
 
-// ============================================
-// JSON TRANSFORM
-// ============================================
+
 
 userSchema.set('toJSON', {
     virtuals: true,
@@ -742,8 +681,7 @@ userSchema.set('toJSON', {
 userSchema.set('toObject', { virtuals: true });
 
 
-// ============================================
-// EXPORT
-// ============================================
+
+
 const User = model('User', userSchema);
 export default User;

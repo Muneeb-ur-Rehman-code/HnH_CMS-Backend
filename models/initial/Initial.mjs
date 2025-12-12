@@ -16,7 +16,13 @@ export const INITIAL_STATUS = Object.freeze({
     PENDING: 'PENDING',
     APPROVED: 'APPROVED',
     REJECTED: 'REJECTED',
-    DONE: 'DONE'
+    DONE: 'DONE',
+    DECLINED: 'DECLINED'
+});
+
+export const INITIAL_TYPE = Object.freeze({
+    STUDY: 'STUDY',
+    VISIT: 'VISIT'
 });
 
 // ============================================
@@ -24,73 +30,71 @@ export const INITIAL_STATUS = Object.freeze({
 // ============================================
 const initialSchema = new Schema(
     {
-        email: {
-            type: String,
-            required: [true, 'Email is required'],
-            lowercase: true,
-            trim: true,
-            validate: {
-                validator: function (value) {
-                    return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value);
-                },
-                message: 'Please provide a valid email address'
-            },
+        studentId: {
+            type: Schema.Types.ObjectId,
+            ref: 'StudentProfile',
+            required: [true, 'Student ID is required'],
             index: true
         },
 
-        firstName: {
+        type: {
             type: String,
-            required: [true, 'First name is required'],
-            trim: true,
-            minlength: [2, 'First name must be at least 2 characters'],
-            maxlength: [50, 'First name cannot exceed 50 characters'],
-            validate: {
-                validator: function (value) {
-                    return /^[a-zA-Z\s'-]+$/.test(value);
-                },
-                message: 'First name can only contain letters, spaces, hyphens, and apostrophes'
-            }
-        },
-
-        lastName: {
-            type: String,
-            required: [true, 'Last name is required'],
-            trim: true,
-            minlength: [2, 'Last name must be at least 2 characters'],
-            maxlength: [50, 'Last name cannot exceed 50 characters'],
-            validate: {
-                validator: function (value) {
-                    return /^[a-zA-Z\s'-]+$/.test(value);
-                },
-                message: 'Last name can only contain letters, spaces, hyphens, and apostrophes'
-            }
-        },
-
-        phoneNumber: {
-            type: String,
-            trim: true,
-            default: null,
-            validate: {
-                validator: function (value) {
-                    if (!value) return true;
-                    return /^[1-9]\d{9,14}$/.test(value);
-                },
-                message: 'Phone number must be in format: country code + number (e.g., 923001234567)'
-            }
+            enum: {
+                values: Object.values(INITIAL_TYPE),
+                message: 'Invalid type: {VALUE}'
+            },
+            required: [true, 'Type is required'],
+            default: INITIAL_TYPE.STUDY,
+            index: true
         },
 
         preferredCountry: {
+            type: Schema.Types.Mixed,
+            default: null,
+            validate: {
+                validator: function (value) {
+                    if (value === null || value === undefined) return true;
+                    // Can be ObjectId or "OTHER" string
+                    if (value === 'OTHER') return true;
+                    return mongoose.Types.ObjectId.isValid(value);
+                },
+                message: 'Preferred country must be a valid Country ID or "OTHER"'
+            }
+        },
+
+        otherCountry: {
             type: String,
             trim: true,
-            maxlength: [100, 'Preferred country cannot exceed 100 characters'],
+            maxlength: [100, 'Other country cannot exceed 100 characters'],
             default: null
         },
 
         preferredUniversity: {
+            type: Schema.Types.Mixed,
+            default: null,
+            validate: {
+                validator: function (value) {
+                    if (value === null || value === undefined) return true;
+                    // Can be ObjectId or "OTHER" string
+                    if (value === 'OTHER') return true;
+                    return mongoose.Types.ObjectId.isValid(value);
+                },
+                message: 'Preferred university must be a valid University ID or "OTHER"'
+            }
+        },
+
+        otherUniversity: {
             type: String,
             trim: true,
-            maxlength: [200, 'Preferred university cannot exceed 200 characters'],
+            maxlength: [200, 'Other university cannot exceed 200 characters'],
             default: null
+        },
+
+        assignedConsultantId: {
+            type: Schema.Types.ObjectId,
+            ref: 'StaffProfile',
+            default: null,
+            index: true
         },
 
         notes: {
@@ -106,7 +110,7 @@ const initialSchema = new Schema(
                 values: Object.values(INITIAL_SOURCE),
                 message: 'Invalid source: {VALUE}'
             },
-            required: [true, 'Source is required'],
+            default: INITIAL_SOURCE.MARKETING,
             index: true
         },
 
@@ -117,13 +121,6 @@ const initialSchema = new Schema(
                 message: 'Invalid status: {VALUE}'
             },
             default: INITIAL_STATUS.PENDING,
-            index: true
-        },
-
-        userId: {
-            type: Schema.Types.ObjectId,
-            ref: 'User',
-            default: null,
             index: true
         },
 
@@ -145,50 +142,85 @@ const initialSchema = new Schema(
             default: null
         },
 
-        markedDoneBy: {
+        markedBy: {
             type: Schema.Types.ObjectId,
-            ref: 'User',
+            ref: 'StaffProfile',
             default: null
         },
 
-        markedDoneAt: {
+        markedAt: {
             type: Date,
             default: null
-        },
-
-        deletedAt: {
-            type: Date,
-            default: null,
-            index: true
         }
-    },{ timestamps: true }
+    }, { timestamps: true }
 );
 
 // ============================================
 // INDEXES
 // ============================================
-initialSchema.index({ email: 1, status: 1 });
+initialSchema.index({ studentId: 1, status: 1 });
 initialSchema.index({ source: 1, status: 1 });
+initialSchema.index({ type: 1, status: 1 });
+initialSchema.index({ assignedConsultantId: 1, status: 1 });
 initialSchema.index({ preferredCountry: 1, status: 1 });
 initialSchema.index({ createdAt: -1 });
 
 // ============================================
-// QUERY MIDDLEWARE - Exclude soft deleted
+// VALIDATION MIDDLEWARE
 // ============================================
-initialSchema.pre(/^find/, function () {
-    if (this.getOptions().includeSoftDeleted !== true) {
-        this.where({ deletedAt: null });
+initialSchema.pre('validate', async function () {
+    // Validate otherCountry is provided when preferredCountry is "OTHER"
+    if (this.preferredCountry === 'OTHER') {
+        if (!this.otherCountry || !this.otherCountry.trim()) {
+            this.invalidate('otherCountry', 'Other country is required when preferred country is "OTHER"');
+        }
+    } else if (this.preferredCountry !== null && this.preferredCountry !== undefined) {
+        // Clear otherCountry if preferredCountry is not "OTHER"
+        this.otherCountry = null;
     }
-    // next();
+
+    // Validate otherUniversity is provided when preferredUniversity is "OTHER" (only for STUDY type)
+    if (this.type === INITIAL_TYPE.STUDY && this.preferredUniversity === 'OTHER') {
+        if (!this.otherUniversity || !this.otherUniversity.trim()) {
+            this.invalidate('otherUniversity', 'Other university is required when preferred university is "OTHER"');
+        }
+    } else if (this.preferredUniversity !== null && this.preferredUniversity !== undefined) {
+        // Clear otherUniversity if preferredUniversity is not "OTHER"
+        this.otherUniversity = null;
+    }
+
+    // Clear preferredUniversity if type is VISIT
+    if (this.type === INITIAL_TYPE.VISIT) {
+        this.preferredUniversity = null;
+        this.otherUniversity = null;
+    }
+
+    // Validate university belongs to country if both are not "OTHER" (only for STUDY type)
+    if (this.type === INITIAL_TYPE.STUDY &&
+        this.preferredCountry &&
+        this.preferredCountry !== 'OTHER' &&
+        mongoose.Types.ObjectId.isValid(this.preferredCountry) &&
+        this.preferredUniversity &&
+        this.preferredUniversity !== 'OTHER' &&
+        mongoose.Types.ObjectId.isValid(this.preferredUniversity)) {
+
+        const University = model('University');
+        const countryId = new mongoose.Types.ObjectId(this.preferredCountry);
+        const universityId = new mongoose.Types.ObjectId(this.preferredUniversity);
+
+        const university = await University.findById(universityId);
+
+        if (!university) {
+            this.invalidate('preferredUniversity', 'University not found');
+        } else if (!university.country || university.country.toString() !== countryId.toString()) {
+            this.invalidate('preferredUniversity', 'Selected university does not belong to the selected country');
+        }
+    }
 });
 
 // ============================================
 // VIRTUALS
 // ============================================
-initialSchema.virtual('fullName').get(function () {
-    return `${this.firstName} ${this.lastName}`;
-});
-
 initialSchema.virtual('isPending').get(function () {
     return this.status === INITIAL_STATUS.PENDING;
 });
@@ -205,247 +237,33 @@ initialSchema.virtual('isDone').get(function () {
     return this.status === INITIAL_STATUS.DONE;
 });
 
-initialSchema.virtual('isDeleted').get(function () {
-    return this.deletedAt !== null;
+initialSchema.virtual('isDeclined').get(function () {
+    return this.status === INITIAL_STATUS.DECLINED;
+});
+
+initialSchema.virtual('isStudy').get(function () {
+    return this.type === INITIAL_TYPE.STUDY;
+});
+
+initialSchema.virtual('isVisit').get(function () {
+    return this.type === INITIAL_TYPE.VISIT;
 });
 
 // ============================================
 // INSTANCE METHODS
 // ============================================
-initialSchema.methods.approve = function (reviewerId) {
-    if (this.status !== INITIAL_STATUS.PENDING) {
-        throw new Error(`Cannot approve record with status: ${this.status}`);
-    }
-
-    this.status = INITIAL_STATUS.APPROVED;
-    this.reviewedBy = reviewerId;
-    this.reviewedAt = new Date();
-    this.rejectionReason = null;
-
-    return this.save();
-};
-
-initialSchema.methods.reject = function (reviewerId, reason) {
-    if (this.status !== INITIAL_STATUS.PENDING) {
-        throw new Error(`Cannot reject record with status: ${this.status}`);
-    }
-
-    if (!reason) {
-        throw new Error('Rejection reason is required');
-    }
-
-    this.status = INITIAL_STATUS.REJECTED;
-    this.reviewedBy = reviewerId;
-    this.reviewedAt = new Date();
-    this.rejectionReason = reason;
-
-    return this.save();
-};
-
 initialSchema.methods.markAsDone = function (consultantId) {
-    if (this.status !== INITIAL_STATUS.APPROVED) {
-        throw new Error('Only approved records can be marked as done');
-    }
-
     this.status = INITIAL_STATUS.DONE;
-    this.markedDoneBy = consultantId;
-    this.markedDoneAt = new Date();
-
+    this.markedBy = consultantId;
+    this.markedAt = new Date();
     return this.save();
 };
 
-initialSchema.methods.resetToPending = function () {
-    this.status = INITIAL_STATUS.PENDING;
-    this.reviewedBy = null;
-    this.reviewedAt = null;
-    this.rejectionReason = null;
-    this.markedDoneBy = null;
-    this.markedDoneAt = null;
-
+initialSchema.methods.markAsDeclined = function (consultantId) {
+    this.status = INITIAL_STATUS.DECLINED;
+    this.markedBy = consultantId;
+    this.markedAt = new Date();
     return this.save();
-};
-
-initialSchema.methods.linkToUser = function (userId) {
-    this.userId = userId;
-    return this.save();
-};
-
-initialSchema.methods.softDelete = function () {
-    this.deletedAt = new Date();
-    return this.save();
-};
-
-initialSchema.methods.restore = function () {
-    this.deletedAt = null;
-    return this.save();
-};
-
-// ============================================
-// STATIC METHODS
-// ============================================
-
-
-initialSchema.statics.findByEmail = function (email) {
-    return this.findOne({ email: email.toLowerCase() });
-};
-
-initialSchema.statics.findActiveByEmail = function (email) {
-    return this.findOne({
-        email: email.toLowerCase(),
-        status: { $ne: INITIAL_STATUS.DONE }
-    });
-};
-
-initialSchema.statics.findPending = function () {
-    return this.find({ status: INITIAL_STATUS.PENDING }).sort({ createdAt: -1 });
-};
-
-initialSchema.statics.findApproved = function (country = null) {
-    const query = { status: INITIAL_STATUS.APPROVED };
-    if (country) {
-        query.preferredCountry = country;
-    }
-    return this.find(query).sort({ createdAt: -1 });
-};
-
-initialSchema.statics.findApprovedForCountries = function (countries) {
-    return this.find({
-        status: INITIAL_STATUS.APPROVED,
-        preferredCountry: { $in: countries }
-    }).sort({ createdAt: -1 });
-};
-
-initialSchema.statics.findByUserId = function (userId) {
-    return this.find({ userId }).sort({ createdAt: -1 });
-};
-
-initialSchema.statics.hasActiveRecord = async function (email) {
-    const count = await this.countDocuments({
-        email: email.toLowerCase(),
-        status: { $in: [INITIAL_STATUS.PENDING, INITIAL_STATUS.APPROVED] }
-    });
-    return count > 0;
-};
-
-initialSchema.statics.hasDoneRecord = async function (email) {
-    const count = await this.countDocuments({
-        email: email.toLowerCase(),
-        status: INITIAL_STATUS.DONE
-    });
-    return count > 0;
-};
-
-initialSchema.statics.createFromMarketing = async function (data) {
-    const { email, firstName, lastName, phoneNumber, preferredCountry, preferredUniversity, notes } =
-        data;
-
-    // Check for existing DONE record
-    const hasDone = await this.hasDoneRecord(email);
-    if (hasDone) {
-        throw new Error('A completed application already exists for this email');
-    }
-
-    // Check for existing active record
-    const existing = await this.findActiveByEmail(email);
-    if (existing) {
-        throw new Error('An active record already exists for this email');
-    }
-
-    return this.create({
-        email,
-        firstName,
-        lastName,
-        phoneNumber: phoneNumber || null,
-        preferredCountry: preferredCountry || null,
-        preferredUniversity: preferredUniversity || null,
-        notes: notes || null,
-        source: INITIAL_SOURCE.MARKETING,
-        status: INITIAL_STATUS.PENDING
-    });
-};
-
-initialSchema.statics.createFromWalkIn = async function (data) {
-    const { email, firstName, lastName, phoneNumber, preferredCountry, preferredUniversity } = data;
-
-    // For walk-in, replace existing pending/rejected records
-    await this.updateMany(
-        {
-            email: email.toLowerCase(),
-            status: { $in: [INITIAL_STATUS.PENDING, INITIAL_STATUS.REJECTED] }
-        },
-        { deletedAt: new Date() }
-    );
-
-    return this.create({
-        email,
-        firstName,
-        lastName,
-        phoneNumber: phoneNumber || null,
-        preferredCountry: preferredCountry || null,
-        preferredUniversity: preferredUniversity || null,
-        source: INITIAL_SOURCE.WALK_IN,
-        status: INITIAL_STATUS.APPROVED
-    });
-};
-
-initialSchema.statics.createFromOnline = async function (userId, data) {
-    const { email, firstName, lastName, phoneNumber, preferredCountry, preferredUniversity } = data;
-
-    // For online, replace existing non-DONE records
-    await this.updateMany(
-        {
-            email: email.toLowerCase(),
-            status: { $ne: INITIAL_STATUS.DONE }
-        },
-        { deletedAt: new Date() }
-    );
-
-    return this.create({
-        email,
-        firstName,
-        lastName,
-        phoneNumber: phoneNumber || null,
-        preferredCountry: preferredCountry || null,
-        preferredUniversity: preferredUniversity || null,
-        source: INITIAL_SOURCE.ONLINE,
-        status: INITIAL_STATUS.APPROVED,
-        userId
-    });
-};
-
-initialSchema.statics.importFromSheets = async function (records) {
-    const summary = {
-        total: records.length,
-        imported: 0,
-        skipped: [],
-        errors: []
-    };
-
-    for (let i = 0; i < records.length; i++) {
-        const record = records[i];
-        const rowNumber = i + 2; // Account for header row
-
-        try {
-            await this.createFromMarketing(record);
-            summary.imported++;
-        } catch (error) {
-            if (error.message.includes('already exists')) {
-                summary.skipped.push({
-                    row: rowNumber,
-                    email: record.email,
-                    reason: error.message
-                });
-            } else {
-                summary.errors.push({
-                    row: rowNumber,
-                    email: record.email,
-                    reason: error.message
-                });
-            }
-        }
-    }
-
-    return summary;
 };
 
 // ============================================

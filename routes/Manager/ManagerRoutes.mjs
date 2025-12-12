@@ -124,12 +124,32 @@ const getVisitVisaCountry = async () => {
 // Get all staff list
 router.get('/staff', managerAuth, async (req, res) => {
     try {
-        const staff = await StaffProfile.find()
-            .populate('userId', 'email firstName lastName phoneNumber status')
+        const { roles } = req.query;
+        let query = {};
+
+        if (roles) {
+            const roleArray = roles.split(',').map(role => role.trim().toUpperCase());
+            const validRoles = Object.values(STAFF_ROLE);
+            const invalidRoles = roleArray.filter(role => !validRoles.includes(role));
+
+            if (invalidRoles.length > 0) {
+                return sendResponse(res, false, null, {
+                    status: 400,
+                    message: `Invalid role(s) provided: ${invalidRoles.join(', ')}`,
+                    code: 'INVALID_ROLE_FILTER'
+                });
+            }
+
+            query.role = { $in: roleArray };
+        }
+
+        const staff = await StaffProfile.find(query)
+            .populate('userId', 'email firstName lastName phone status')
             .sort({ createdAt: -1 });
 
         return sendResponse(res, true, staff);
     } catch (error) {
+        console.error('Error fetching staff list:', error);
         return sendResponse(res, false, null, error);
     }
 });

@@ -8,6 +8,7 @@ import signupStaffRoutes from './Auth/SignUpStaffRoute.mjs';
 import StudentRoutes from './Student/Student.mjs';
 // import ConsultantRoutes from './Consultant/Consultant.mjs'
 import CountryRoutes from './Gen/CountryRoutes.mjs';
+import UniversityRoutes from './Gen/UniversityRoutes.mjs';
 import ManagerRoutes from './Manager/ManagerRoutes.mjs';
 
 const router = express.Router();

@@ -183,21 +183,21 @@ async function seedUsersAndProfiles() {
     success(`Created ${staffRoles.length * 2} staff users and 2 student users.`);
 }
 
-async function seedCountries() {
-    progress('Seeding countries...');
+// async function seedCountries() {
+//     progress('Seeding countries...');
 
-    const countryData = [
-        { name: 'United Kingdom', code: 'GBR' },
-        { name: 'Canada', code: 'CAN' }
-    ];
+//     const countryData = [
+//         { name: 'United Kingdom', code: 'GBR' },
+//         { name: 'Canada', code: 'CAN' }
+//     ];
 
-    for (const data of countryData) {
-        const country = await Country.createCountry(data);
-        createdData.countries[data.name] = country;
-    }
+//     for (const data of countryData) {
+//         const country = await Country.createCountry(data);
+//         createdData.countries[data.name] = country;
+//     }
 
-    success(`Created ${countryData.length} countries.`);
-}
+//     success(`Created ${countryData.length} countries.`);
+// }
 
 async function seedCountries() {
     progress('Seeding countries...');

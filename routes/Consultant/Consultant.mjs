@@ -10,10 +10,10 @@ import Application from '../../models/Process/Process.mjs';
 import Invoice from '../../models/Invoice/Invoice.mjs';
 import Task from '../../models/Task/Tasks.mjs';
 import Document from '../../models/Docx/Document.mjs';
-import { attachUser, requireRole, requireStaffVerified } from '../../middlewares/Auth.mjs';
+import { requireConsultant } from '../../middlewares/Auth.mjs';
 import { USER_ROLE, USER_SOURCE, USER_STATUS } from '../../models/Users/_UsersMain.mjs';
 import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
-import { INITIAL_STATUS } from '../../models/initial/Initial.mjs';
+import { INITIAL_STATUS, INITIAL_TYPE } from '../../models/initial/Initial.mjs';
 import { APPLICATION_STATUS, CURRENCY } from '../../models/Process/Process.mjs';
 import { INVOICE_STATUS, INVOICE_PAYMENT_TYPE } from '../../models/Invoice/Invoice.mjs';
 import { TASK_STATUS, TASK_PRIORITY } from '../../models/Task/Tasks.mjs';
@@ -22,28 +22,6 @@ import { uploadSingle } from '../../middlewares/upload.mjs';
 
 const router = express.Router();
 
-// Middleware to verify consultant role
-const requireConsultant = [
-    attachUser,
-    requireStaffVerified,
-    async (req, res, next) => {
-        const staffProfile = await StaffProfile.findOne({ userId: req.user._id });
-        if (!staffProfile || staffProfile.staffRole !== STAFF_ROLE.CONSULTANT) {
-            return res.status(403).json({
-                success: false,
-                message: 'Consultant access required'
-            });
-        }
-        req.staffProfile = staffProfile;
-        next();
-    }
-];
-
-// Helper to get consultant's assigned countries
-async function getConsultantCountries(staffProfileId) {
-    const countries = await Country.getCountriesByConsultant(staffProfileId);
-    return countries.map(c => c.name);
-}
 
 // ============================================
 // INITIALS
@@ -51,29 +29,36 @@ async function getConsultantCountries(staffProfileId) {
 
 /**
  * GET /api/consultant/initials
- * Get approved initials for consultant's countries
+ * Get verified initials assigned to consultant
  */
 router.get('/initials', requireConsultant, async (req, res) => {
     try {
-        const countries = await getConsultantCountries(req.staffProfile._id);
+        const { status } = req.query;
+        const consultantId = req.staffProfile._id;
 
         const query = {
-            status: INITIAL_STATUS.APPROVED,
-            deletedAt: null
+            assignedConsultantId: consultantId,
+            status: { $in: [INITIAL_STATUS.APPROVED, INITIAL_STATUS.DONE, INITIAL_STATUS.DECLINED] }
         };
 
-        // Filter by consultant's countries if assigned
-        if (countries.length > 0) {
-            query.preferredCountry = { $in: countries };
+        if (status && Object.values(INITIAL_STATUS).includes(status)) {
+            query.status = status;
         }
 
-        const initials = await Initial.find(query).sort({ createdAt: -1 });
+        const initials = await Initial.find(query)
+            .populate('studentId', 'userId nationality')
+            .populate({
+                path: 'studentId',
+                populate: { path: 'userId', select: 'email firstName lastName phone' }
+            })
+            .populate('preferredCountry')
+            .populate('preferredUniversity')
+            .sort({ createdAt: -1 });
 
         return res.status(200).json({
             success: true,
             data: {
                 count: initials.length,
-                assignedCountries: countries,
                 initials
             }
         });
@@ -95,39 +80,31 @@ router.get('/initials', requireConsultant, async (req, res) => {
 router.get('/initials/:initialId', requireConsultant, async (req, res) => {
     try {
         const { initialId } = req.params;
+        const consultantId = req.staffProfile._id;
 
         const initial = await Initial.findOne({
             _id: initialId,
-            status: INITIAL_STATUS.APPROVED,
-            deletedAt: null
-        });
+            assignedConsultantId: consultantId,
+            status: { $in: [INITIAL_STATUS.APPROVED, INITIAL_STATUS.DONE, INITIAL_STATUS.DECLINED] }
+        })
+            .populate('studentId', 'userId nationality')
+            .populate({
+                path: 'studentId',
+                populate: { path: 'userId', select: 'email firstName lastName phone' }
+            })
+            .populate('preferredCountry')
+            .populate('preferredUniversity');
 
         if (!initial) {
             return res.status(404).json({
                 success: false,
-                message: 'Initial not found or not approved'
+                message: 'Initial not found or not assigned to you'
             });
         }
 
-        // Check if user exists
-        const existingUser = await User.findOne({ email: initial.email });
-        const studentProfile = existingUser
-            ? await StudentProfile.findOne({ userId: existingUser._id })
-            : null;
-
         return res.status(200).json({
             success: true,
-            data: {
-                initial,
-                existingUser: existingUser ? {
-                    id: existingUser._id,
-                    email: existingUser.email,
-                    firstName: existingUser.firstName,
-                    lastName: existingUser.lastName,
-                    phoneNumber: existingUser.phoneNumber
-                } : null,
-                studentProfile
-            }
+            data: { initial }
         });
 
     } catch (error) {
@@ -135,6 +112,104 @@ router.get('/initials/:initialId', requireConsultant, async (req, res) => {
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch initial',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * PUT /api/consultant/initials/:initialId/mark-done
+ * Mark initial as done
+ */
+router.put('/initials/:initialId/mark-done', requireConsultant, async (req, res) => {
+    try {
+        const { initialId } = req.params;
+        const consultantId = req.staffProfile._id;
+
+        const initial = await Initial.findOne({
+            _id: initialId,
+            assignedConsultantId: consultantId,
+            status: { $in: [INITIAL_STATUS.APPROVED, INITIAL_STATUS.DECLINED] }
+        });
+
+        if (!initial) {
+            return res.status(404).json({
+                success: false,
+                message: 'Initial not found or not assigned to you'
+            });
+        }
+
+        await initial.markAsDone(consultantId);
+
+        const populatedInitial = await Initial.findById(initialId)
+            .populate('studentId', 'userId nationality')
+            .populate({
+                path: 'studentId',
+                populate: { path: 'userId', select: 'email firstName lastName phone' }
+            })
+            .populate('preferredCountry')
+            .populate('preferredUniversity');
+
+        return res.status(200).json({
+            success: true,
+            message: 'Initial marked as done',
+            data: populatedInitial
+        });
+
+    } catch (error) {
+        console.error('Mark done error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to mark initial as done',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * PUT /api/consultant/initials/:initialId/mark-declined
+ * Mark initial as declined
+ */
+router.put('/initials/:initialId/mark-declined', requireConsultant, async (req, res) => {
+    try {
+        const { initialId } = req.params;
+        const consultantId = req.staffProfile._id;
+
+        const initial = await Initial.findOne({
+            _id: initialId,
+            assignedConsultantId: consultantId,
+            status: { $in: [INITIAL_STATUS.APPROVED, INITIAL_STATUS.DONE] }
+        });
+
+        if (!initial) {
+            return res.status(404).json({
+                success: false,
+                message: 'Initial not found or not assigned to you'
+            });
+        }
+
+        await initial.markAsDeclined(consultantId);
+
+        const populatedInitial = await Initial.findById(initialId)
+            .populate('studentId', 'userId nationality')
+            .populate({
+                path: 'studentId',
+                populate: { path: 'userId', select: 'email firstName lastName phone' }
+            })
+            .populate('preferredCountry')
+            .populate('preferredUniversity');
+
+        return res.status(200).json({
+            success: true,
+            message: 'Initial marked as declined',
+            data: populatedInitial
+        });
+
+    } catch (error) {
+        console.error('Mark declined error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to mark initial as declined',
             error: error.message
         });
     }
@@ -171,33 +246,26 @@ router.post('/applications', requireConsultant, async (req, res) => {
         // Get initial
         const initial = await Initial.findOne({
             _id: initialId,
-            status: INITIAL_STATUS.APPROVED,
-            deletedAt: null
-        });
+            assignedConsultantId: consultantId,
+            status: INITIAL_STATUS.APPROVED
+        })
+            .populate('studentId', 'userId')
+            .populate({
+                path: 'studentId',
+                populate: { path: 'userId', select: 'email firstName lastName phone' }
+            });
 
         if (!initial) {
             return res.status(404).json({
                 success: false,
-                message: 'Initial not found or not approved'
+                message: 'Initial not found, not approved, or not assigned to you'
             });
         }
 
-        // Find or create user
-        let user = await User.findOne({ email: initial.email });
+        const student = initial.studentId;
+        const user = student.userId;
 
-        if (!user) {
-            user = await User.create({
-                email: initial.email,
-                firstName: initial.firstName,
-                lastName: initial.lastName,
-                phoneNumber: initial.phoneNumber,
-                role: USER_ROLE.STUDENT,
-                source: USER_SOURCE.CONSULTANT,
-                status: USER_STATUS.ACTIVE
-            });
-        }
-
-        // Get student profile if exists
+        // Get student profile
         const studentProfile = await StudentProfile.findOne({ userId: user._id });
 
         // Create application
@@ -206,9 +274,9 @@ router.post('/applications', requireConsultant, async (req, res) => {
             consultantId,
             initialId: initial._id,
             email: user.email,
-            firstName: user.firstName || initial.firstName,
-            lastName: user.lastName || initial.lastName,
-            phoneNumber: user.phoneNumber || initial.phoneNumber,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            phoneNumber: user.phone?.number || null,
             nationality: studentProfile?.nationality || null,
             passportNumber: studentProfile?.passportNumber || null,
             passportExpiry: studentProfile?.passportExpiry || null,
@@ -223,7 +291,7 @@ router.post('/applications', requireConsultant, async (req, res) => {
         });
 
         // Mark initial as done
-        await initial.markAsDone(consultantId, application._id);
+        await initial.markAsDone(consultantId);
 
         return res.status(201).json({
             success: true,
@@ -1173,18 +1241,13 @@ router.put('/documents/:documentId/reject', requireConsultant, async (req, res) 
  */
 router.get('/dashboard', requireConsultant, async (req, res) => {
     try {
-        const consultantId = req.user._id;
-        const countries = await getConsultantCountries(req.staffProfile._id);
+        const consultantId = req.staffProfile._id;
 
-        // Pending initials
-        const initialQuery = {
-            status: INITIAL_STATUS.APPROVED,
-            deletedAt: null
-        };
-        if (countries.length > 0) {
-            initialQuery.preferredCountry = { $in: countries };
-        }
-        const pendingInitials = await Initial.countDocuments(initialQuery);
+        // Pending initials assigned to consultant
+        const pendingInitials = await Initial.countDocuments({
+            assignedConsultantId: consultantId,
+            status: INITIAL_STATUS.APPROVED
+        });
 
         // Applications by status
         const applications = await Application.find({

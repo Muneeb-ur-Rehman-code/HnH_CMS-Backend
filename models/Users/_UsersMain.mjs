@@ -109,7 +109,6 @@ const userSchema = new Schema(
                 },
                 message: 'Please provide a valid email address'
             },
-            index: true
         },
 
         emailOtp: {
@@ -244,7 +243,6 @@ const userSchema = new Schema(
     }, { timestamps: true }
 );
 
-userSchema.index({ email: 1 });
 userSchema.index({ role: 1, status: 1 });
 userSchema.index({ createdAt: -1 });
 

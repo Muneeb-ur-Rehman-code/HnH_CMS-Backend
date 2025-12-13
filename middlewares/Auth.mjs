@@ -25,9 +25,10 @@ async function attachUserCore(req) {
     try {
         decoded = verifyToken(authHeader);
     } catch (e) {
-        const err = new Error('Invalid or expired token');
+        const err = new Error(e.message || 'Invalid or expired token');
         err.status = 401;
         err.success = false;
+        err.originalError = e.message;
         throw err;
     }
 
@@ -121,7 +122,8 @@ export const requireRole = (...roles) => {
                 }
 
                 if (requestedStaffRoles.includes(staffProfile.staffRole)) {
-                    if (!req.staffProfile) req.staffProfile = staffProfile;
+                    req.staffProfile = staffProfile;
+                    req.user.staffProfile = staffProfile;
                     return next();
                 }
 

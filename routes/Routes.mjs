@@ -6,10 +6,12 @@ import receptionistRoutes from './Receptionist/receptionist.mjs';
 import accountantRoutes from './Accountant/accountant.mjs';
 import signupStaffRoutes from './Auth/SignUpStaffRoute.mjs';
 import StudentRoutes from './Student/Student.mjs';
-// import ConsultantRoutes from './Consultant/Consultant.mjs'
+import ConsultantRoutes from './Consultant/Consultant.mjs';
+import CheckRoute from './Gen/CheckRole.mjs';
 import CountryRoutes from './Gen/CountryRoutes.mjs';
 import UniversityRoutes from './Gen/UniversityRoutes.mjs';
 import ManagerRoutes from './Manager/ManagerRoutes.mjs';
+import AgentRoutes from './Agent/Agent.mjs';
 
 const router = express.Router();
 
@@ -23,9 +25,12 @@ router.use('/onboarding', onboardingRoutes);
 router.use('/receptionist', receptionistRoutes);
 router.use('/accountant', accountantRoutes);
 router.use('/student', StudentRoutes);
-// router.use('/consultant', ConsultantRoutes);
+router.use('/consultant', ConsultantRoutes);
 router.use('/country', CountryRoutes);
+router.use('/university', UniversityRoutes);
+router.use('/checkAccess', CheckRoute);
 router.use('/manager', ManagerRoutes);
+router.use('/agent', AgentRoutes);
 
 
 

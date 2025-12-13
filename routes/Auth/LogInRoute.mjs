@@ -73,8 +73,8 @@ router.post('/login', async (req, res) => {
             status: user.status,
             emailVerified: await user.isEmailVerifiedAsync(),
             phoneVerified: await user.isPhoneVerifiedAsync(),
-            phoneNumber: user.phoneNumber,
-            dateOfBirth: user.dateOfBirth,
+            phoneNumber: user.phone?.number || null,
+            dateOfBirth: user.dob || null,
             gender: user.gender,
             source: user.source
         };

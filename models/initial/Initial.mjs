@@ -17,7 +17,8 @@ export const INITIAL_STATUS = Object.freeze({
     APPROVED: 'APPROVED',
     REJECTED: 'REJECTED',
     DONE: 'DONE',
-    DECLINED: 'DECLINED'
+    DECLINED: 'DECLINED',
+    REFUSED: 'REFUSED'
 });
 
 export const INITIAL_TYPE = Object.freeze({
@@ -239,6 +240,10 @@ initialSchema.virtual('isDone').get(function () {
 
 initialSchema.virtual('isDeclined').get(function () {
     return this.status === INITIAL_STATUS.DECLINED;
+});
+
+initialSchema.virtual('isRefused').get(function () {
+    return this.status === INITIAL_STATUS.REFUSED;
 });
 
 initialSchema.virtual('isStudy').get(function () {

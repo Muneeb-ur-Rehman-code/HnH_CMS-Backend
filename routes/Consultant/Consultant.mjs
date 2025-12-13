@@ -1,1385 +1,292 @@
-// routes/consultant/consultant.mjs
+// routes/Consultant/Consultant.mjs
 import express from 'express';
 import mongoose from 'mongoose';
-import User from '../../models/Users/_UsersMain.mjs';
-import StaffProfile from '../../models/Users/StaffProfile.mjs';
-import Country from '../../models/Country/CountryModel.mjs';
+import { attachUser, requireRole } from '../../middlewares/Auth.mjs';
+import { USER_ROLE } from '../../models/Users/_UsersMain.mjs';
+import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
+import Initial, { INITIAL_STATUS } from '../../models/initial/Initial.mjs';
+import Process, { PROCESS_STATUS } from '../../models/Process/Process.mjs';
 import StudentProfile from '../../models/Users/Student.mjs';
-import Initial from '../../models/initial/Initial.mjs';
-import Application from '../../models/Process/Process.mjs';
+import User from '../../models/Users/_UsersMain.mjs';
 import Invoice from '../../models/Invoice/Invoice.mjs';
+import StaffProfile, { STAFF_ROLE as ACCOUNTANT_ROLE } from '../../models/Users/StaffProfile.mjs';
 import Task from '../../models/Task/Tasks.mjs';
 import Document from '../../models/Docx/Document.mjs';
-import { requireConsultant } from '../../middlewares/Auth.mjs';
-import { USER_ROLE, USER_SOURCE, USER_STATUS } from '../../models/Users/_UsersMain.mjs';
-import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
-import { INITIAL_STATUS, INITIAL_TYPE } from '../../models/initial/Initial.mjs';
-import { APPLICATION_STATUS, CURRENCY } from '../../models/Process/Process.mjs';
-import { INVOICE_STATUS, INVOICE_PAYMENT_TYPE } from '../../models/Invoice/Invoice.mjs';
-import { TASK_STATUS, TASK_PRIORITY } from '../../models/Task/Tasks.mjs';
-import { DOCUMENT_TYPE, DOCUMENT_STATUS } from '../../models/Docx/Document.mjs';
-import { uploadSingle } from '../../middlewares/upload.mjs';
 
 const router = express.Router();
 
+const requireConsultant = [
+    attachUser,
+    requireRole(STAFF_ROLE.CONSULTANT),
+];
 
-// ============================================
-// INITIALS
-// ============================================
-
-/**
- * GET /api/consultant/initials
- * Get verified initials assigned to consultant
- */
+// Get all initials assigned to the consultant that are in the 'APPROVED' state
 router.get('/initials', requireConsultant, async (req, res) => {
     try {
-        const { status } = req.query;
-        const consultantId = req.staffProfile._id;
-
-        const query = {
-            assignedConsultantId: consultantId,
-            status: { $in: [INITIAL_STATUS.APPROVED, INITIAL_STATUS.DONE, INITIAL_STATUS.DECLINED] }
-        };
-
-        if (status && Object.values(INITIAL_STATUS).includes(status)) {
-            query.status = status;
-        }
-
-        const initials = await Initial.find(query)
-            .populate('studentId', 'userId nationality')
-            .populate({
-                path: 'studentId',
-                populate: { path: 'userId', select: 'email firstName lastName phone' }
-            })
-            .populate('preferredCountry')
-            .populate('preferredUniversity')
-            .sort({ createdAt: -1 });
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                count: initials.length,
-                initials
-            }
-        });
-
-    } catch (error) {
-        console.error('Get initials error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch initials',
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/consultant/initials/:initialId
- * Get specific initial details
- */
-router.get('/initials/:initialId', requireConsultant, async (req, res) => {
-    try {
-        const { initialId } = req.params;
-        const consultantId = req.staffProfile._id;
-
-        const initial = await Initial.findOne({
-            _id: initialId,
-            assignedConsultantId: consultantId,
-            status: { $in: [INITIAL_STATUS.APPROVED, INITIAL_STATUS.DONE, INITIAL_STATUS.DECLINED] }
-        })
-            .populate('studentId', 'userId nationality')
-            .populate({
-                path: 'studentId',
-                populate: { path: 'userId', select: 'email firstName lastName phone' }
-            })
-            .populate('preferredCountry')
-            .populate('preferredUniversity');
-
-        if (!initial) {
-            return res.status(404).json({
-                success: false,
-                message: 'Initial not found or not assigned to you'
-            });
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: { initial }
-        });
-
-    } catch (error) {
-        console.error('Get initial error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch initial',
-            error: error.message
-        });
-    }
-});
-
-/**
- * PUT /api/consultant/initials/:initialId/mark-done
- * Mark initial as done
- */
-router.put('/initials/:initialId/mark-done', requireConsultant, async (req, res) => {
-    try {
-        const { initialId } = req.params;
-        const consultantId = req.staffProfile._id;
-
-        const initial = await Initial.findOne({
-            _id: initialId,
-            assignedConsultantId: consultantId,
-            status: { $in: [INITIAL_STATUS.APPROVED, INITIAL_STATUS.DECLINED] }
-        });
-
-        if (!initial) {
-            return res.status(404).json({
-                success: false,
-                message: 'Initial not found or not assigned to you'
-            });
-        }
-
-        await initial.markAsDone(consultantId);
-
-        const populatedInitial = await Initial.findById(initialId)
-            .populate('studentId', 'userId nationality')
-            .populate({
-                path: 'studentId',
-                populate: { path: 'userId', select: 'email firstName lastName phone' }
-            })
-            .populate('preferredCountry')
-            .populate('preferredUniversity');
-
-        return res.status(200).json({
-            success: true,
-            message: 'Initial marked as done',
-            data: populatedInitial
-        });
-
-    } catch (error) {
-        console.error('Mark done error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to mark initial as done',
-            error: error.message
-        });
-    }
-});
-
-/**
- * PUT /api/consultant/initials/:initialId/mark-declined
- * Mark initial as declined
- */
-router.put('/initials/:initialId/mark-declined', requireConsultant, async (req, res) => {
-    try {
-        const { initialId } = req.params;
-        const consultantId = req.staffProfile._id;
-
-        const initial = await Initial.findOne({
-            _id: initialId,
-            assignedConsultantId: consultantId,
-            status: { $in: [INITIAL_STATUS.APPROVED, INITIAL_STATUS.DONE] }
-        });
-
-        if (!initial) {
-            return res.status(404).json({
-                success: false,
-                message: 'Initial not found or not assigned to you'
-            });
-        }
-
-        await initial.markAsDeclined(consultantId);
-
-        const populatedInitial = await Initial.findById(initialId)
-            .populate('studentId', 'userId nationality')
-            .populate({
-                path: 'studentId',
-                populate: { path: 'userId', select: 'email firstName lastName phone' }
-            })
-            .populate('preferredCountry')
-            .populate('preferredUniversity');
-
-        return res.status(200).json({
-            success: true,
-            message: 'Initial marked as declined',
-            data: populatedInitial
-        });
-
-    } catch (error) {
-        console.error('Mark declined error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to mark initial as declined',
-            error: error.message
-        });
-    }
-});
-
-// ============================================
-// APPLICATIONS
-// ============================================
-
-/**
- * POST /api/consultant/applications
- * Create application from initial
- */
-router.post('/applications', requireConsultant, async (req, res) => {
-    try {
-        const consultantId = req.user._id;
-        const {
-            initialId,
-            targetCountry,
-            targetUniversity,
-            targetCourse,
-            intakePreference,
-            budget
-        } = req.body;
-
-        // Validate required fields
-        if (!initialId || !targetCountry || !targetUniversity || !targetCourse) {
-            return res.status(400).json({
-                success: false,
-                message: 'Initial ID, target country, university, and course are required'
-            });
-        }
-
-        // Get initial
-        const initial = await Initial.findOne({
-            _id: initialId,
+        const consultantId = req.user.staffProfile._id;
+        const initials = await Initial.find({
             assignedConsultantId: consultantId,
             status: INITIAL_STATUS.APPROVED
-        })
-            .populate('studentId', 'userId')
-            .populate({
-                path: 'studentId',
-                populate: { path: 'userId', select: 'email firstName lastName phone' }
-            });
-
-        if (!initial) {
-            return res.status(404).json({
-                success: false,
-                message: 'Initial not found, not approved, or not assigned to you'
-            });
-        }
-
-        const student = initial.studentId;
-        const user = student.userId;
-
-        // Get student profile
-        const studentProfile = await StudentProfile.findOne({ userId: user._id });
-
-        // Create application
-        const application = await Application.create({
-            studentId: user._id,
-            consultantId,
-            initialId: initial._id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            phoneNumber: user.phone?.number || null,
-            nationality: studentProfile?.nationality || null,
-            passportNumber: studentProfile?.passportNumber || null,
-            passportExpiry: studentProfile?.passportExpiry || null,
-            address: studentProfile?.address || null,
-            educationLevel: studentProfile?.educationLevel || null,
-            targetCountry,
-            targetUniversity,
-            targetCourse,
-            intakePreference: intakePreference || null,
-            budget: budget || null,
-            status: APPLICATION_STATUS.GATHERING_INFO
-        });
-
-        // Mark initial as done
-        await initial.markAsDone(consultantId);
-
-        return res.status(201).json({
-            success: true,
-            message: 'Application created successfully',
-            data: { application }
-        });
-
+        }).populate('studentId');
+        res.status(200).json({ success: true, data: initials });
     } catch (error) {
-        console.error('Create application error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to create application',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Failed to fetch initials', error: error.message });
     }
 });
 
-/**
- * GET /api/consultant/applications
- * Get all applications for this consultant
- */
-router.get('/applications', requireConsultant, async (req, res) => {
+// Decline an initial
+router.patch('/initials/:initialId/decline', requireConsultant, async (req, res) => {
     try {
-        const consultantId = req.user._id;
-        const { status } = req.query;
+        const { initialId } = req.params;
+        const initial = await Initial.findById(initialId);
 
-        const query = {
-            consultantId,
-            deletedAt: null
+        if (!initial || initial.assignedConsultantId.toString() !== req.user.staffProfile._id.toString()) {
+            return res.status(404).json({ success: false, message: 'Initial not found or not assigned to you.' });
+        }
+        if (initial.status !== INITIAL_STATUS.APPROVED) {
+            return res.status(400).json({ success: false, message: `Cannot decline an initial with status '${initial.status}'` });
+        }
+
+        initial.status = INITIAL_STATUS.DECLINED;
+        await initial.save();
+        res.status(200).json({ success: true, message: 'Initial declined successfully.', data: initial });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to decline initial', error: error.message });
+    }
+});
+
+// Create a process from an initial
+router.post('/initials/:initialId/create-process', requireConsultant, async (req, res) => {
+    try {
+        const { initialId } = req.params;
+        const initial = await Initial.findById(initialId).populate({
+            path: 'studentId',
+            populate: { path: 'user' }
+        });
+
+        if (!initial || initial.assignedConsultantId.toString() !== req.user.staffProfile._id.toString()) {
+            return res.status(404).json({ success: false, message: 'Initial not found or not assigned to you.' });
+        }
+        if (initial.status !== INITIAL_STATUS.APPROVED) {
+            return res.status(400).json({ success: false, message: `Cannot create a process from an initial with status '${initial.status}'.` });
+        }
+
+        const studentUser = initial.studentId.user;
+        const studentProfile = initial.studentId;
+
+        const processData = {
+            studentId: studentProfile._id,
+            initialId: initial._id,
+            consultantId: req.user.staffProfile._id,
+            applicantData: {
+                firstName: studentUser.firstName,
+                lastName: studentUser.lastName,
+                email: studentUser.email,
+                phone: studentUser.phone.number,
+                dob: studentUser.dob,
+                gender: studentUser.gender,
+                nationality: studentProfile.nationality,
+                passportNumber: studentProfile.passportNumber,
+                passportExpiry: studentProfile.passportExpiry,
+                address: studentProfile.address,
+                educationLevel: studentProfile.educationLevel,
+                currentInstitution: studentProfile.currentInstitution,
+                graduationYear: studentProfile.graduationYear,
+                lastGpa: studentProfile.lastGpa,
+                englishProficiency: studentProfile.englishProficiency
+            },
+            ...req.body // Any additional fields from the request body
         };
 
-        if (status) {
-            query.status = status;
-        }
+        const newProcess = new Process(processData);
+        await newProcess.save();
 
-        const applications = await Application.find(query)
-            .populate('studentId', 'email firstName lastName phoneNumber')
-            .sort({ createdAt: -1 });
+        initial.status = INITIAL_STATUS.DONE;
+        await initial.save();
 
-        return res.status(200).json({
-            success: true,
-            data: {
-                count: applications.length,
-                applications
-            }
-        });
+        res.status(201).json({ success: true, message: 'Process created successfully', data: newProcess });
 
     } catch (error) {
-        console.error('Get applications error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch applications',
-            error: error.message
-        });
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+        res.status(500).json({ success: false, message: 'Failed to create process', error: error.message });
     }
 });
 
-/**
- * GET /api/consultant/applications/:applicationId
- * Get specific application details
- */
-router.get('/applications/:applicationId', requireConsultant, async (req, res) => {
+// Get a process by ID
+router.get('/processes/:processId', requireConsultant, async (req, res) => {
     try {
-        const { applicationId } = req.params;
-        const consultantId = req.user._id;
-
-        const application = await Application.findOne({
-            _id: applicationId,
-            consultantId,
-            deletedAt: null
-        })
-            .populate('studentId', 'email firstName lastName phoneNumber emailVerified phoneVerified')
-            .populate('initialId');
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
+        const { processId } = req.params;
+        const process = await Process.findById(processId).populate('initial');
+        if (!process || process.consultantId.toString() !== req.user.staffProfile._id.toString()) {
+            return res.status(404).json({ success: false, message: 'Process not found or not assigned to you.' });
         }
-
-        // Get related data counts
-        const invoiceCount = await Invoice.countDocuments({ applicationId, deletedAt: null });
-        const taskCount = await Task.countDocuments({ applicationId, deletedAt: null });
-        const documentCount = await Document.countDocuments({ applicationId, deletedAt: null });
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                application,
-                counts: {
-                    invoices: invoiceCount,
-                    tasks: taskCount,
-                    documents: documentCount
-                }
-            }
-        });
-
+        res.status(200).json({ success: true, data: process });
     } catch (error) {
-        console.error('Get application error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch application',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Failed to fetch process', error: error.message });
     }
 });
 
-/**
- * PUT /api/consultant/applications/:applicationId
- * Update application details
- */
-router.put('/applications/:applicationId', requireConsultant, async (req, res) => {
+// Update a process (only when GATHERING_INFO)
+router.put('/processes/:processId', requireConsultant, async (req, res) => {
     try {
-        const { applicationId } = req.params;
-        const consultantId = req.user._id;
+        const { processId } = req.params;
+        const process = await Process.findById(processId);
 
-        const application = await Application.findOne({
-            _id: applicationId,
-            consultantId,
-            deletedAt: null
-        });
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
+        if (!process || process.consultantId.toString() !== req.user.staffProfile._id.toString()) {
+            return res.status(404).json({ success: false, message: 'Process not found or not assigned to you.' });
+        }
+        if (process.status !== PROCESS_STATUS.GATHERING_INFO) {
+            return res.status(400).json({ success: false, message: `Cannot update a process with status '${process.status}'.` });
         }
 
-        const {
-            firstName,
-            lastName,
-            phoneNumber,
-            nationality,
-            passportNumber,
-            passportExpiry,
-            address,
-            educationLevel,
-            targetCountry,
-            targetUniversity,
-            targetCourse,
-            intakePreference,
-            budget
-        } = req.body;
+        Object.assign(process, req.body);
+        await process.save();
 
-        // Update allowed fields
-        if (firstName) application.firstName = firstName;
-        if (lastName) application.lastName = lastName;
-        if (phoneNumber) application.phoneNumber = phoneNumber;
-        if (nationality !== undefined) application.nationality = nationality;
-        if (passportNumber !== undefined) application.passportNumber = passportNumber;
-        if (passportExpiry !== undefined) application.passportExpiry = passportExpiry;
-        if (address !== undefined) application.address = address;
-        if (educationLevel !== undefined) application.educationLevel = educationLevel;
-        if (targetCountry) application.targetCountry = targetCountry;
-        if (targetUniversity) application.targetUniversity = targetUniversity;
-        if (targetCourse) application.targetCourse = targetCourse;
-        if (intakePreference !== undefined) application.intakePreference = intakePreference;
-        if (budget !== undefined) application.budget = budget;
-
-        await application.save();
-
-        return res.status(200).json({
-            success: true,
-            message: 'Application updated successfully',
-            data: { application }
-        });
-
+        res.status(200).json({ success: true, message: 'Process updated successfully', data: process });
     } catch (error) {
-        console.error('Update application error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to update application',
-            error: error.message
-        });
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+        res.status(500).json({ success: false, message: 'Failed to update process', error: error.message });
     }
 });
 
-/**
- * PUT /api/consultant/applications/:applicationId/status
- * Update application status
- */
-router.put('/applications/:applicationId/status', requireConsultant, async (req, res) => {
+// Update process status
+router.patch('/processes/:processId/status', requireConsultant, async (req, res) => {
     try {
-        const { applicationId } = req.params;
+        const { processId } = req.params;
         const { status, notes } = req.body;
-        const consultantId = req.user._id;
+        const process = await Process.findById(processId);
 
-        if (!status) {
-            return res.status(400).json({
-                success: false,
-                message: 'Status is required'
-            });
+        if (!process || process.consultantId.toString() !== req.user.staffProfile._id.toString()) {
+            return res.status(404).json({ success: false, message: 'Process not found or not assigned to you.' });
         }
 
-        const application = await Application.findOne({
-            _id: applicationId,
-            consultantId,
-            deletedAt: null
-        });
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
-        }
-
-        await application.updateStatus(status, consultantId, notes);
-
-        return res.status(200).json({
-            success: true,
-            message: 'Application status updated successfully',
-            data: { application }
-        });
+        await process.updateStatus(status, req.user, notes);
+        res.status(200).json({ success: true, message: `Process status updated to ${status}` });
 
     } catch (error) {
-        console.error('Update status error:', error);
-        return res.status(400).json({
-            success: false,
-            message: error.message || 'Failed to update status'
-        });
+        res.status(400).json({ success: false, message: error.message });
     }
 });
 
-// ============================================
-// INVOICES
-// ============================================
-
-/**
- * POST /api/consultant/applications/:applicationId/invoices
- * Create invoice for application
- */
-router.post('/applications/:applicationId/invoices', requireConsultant, async (req, res) => {
+// Create an invoice for a process
+router.post('/processes/:processId/invoices', requireConsultant, async (req, res) => {
     try {
-        const { applicationId } = req.params;
-        const consultantId = req.user._id;
-        const {
-            accountantId,
-            paymentType,
-            amount,
-            currency,
-            breakdown,
-            dueDate,
-            notes
-        } = req.body;
+        const { processId } = req.params;
+        const process = await Process.findById(processId);
 
-        // Validate required fields
-        if (!paymentType || !amount) {
-            return res.status(400).json({
-                success: false,
-                message: 'Payment type and amount are required'
-            });
+        if (!process || process.consultantId.toString() !== req.user.staffProfile._id.toString()) {
+            return res.status(404).json({ success: false, message: 'Process not found or not assigned to you.' });
         }
 
-        // Verify application belongs to consultant
-        const application = await Application.findOne({
-            _id: applicationId,
-            consultantId,
-            deletedAt: null
-        });
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
+        const openInvoice = await Invoice.findOne({ processId, status: { $nin: [INVOICE_STATUS.APPROVED, INVOICE_STATUS.CANCELLED] } });
+        if (openInvoice) {
+            return res.status(400).json({ success: false, message: 'An open invoice already exists for this process.' });
         }
 
-        // Verify accountant if provided
-        if (accountantId) {
-            const accountantProfile = await StaffProfile.findOne({
-                userId: accountantId,
-                staffRole: STAFF_ROLE.ACCOUNTANT,
-                verificationStatus: 'VERIFIED',
-                deletedAt: null
-            });
+        const invoiceData = { processId, ...req.body };
+        const newInvoice = new Invoice(invoiceData);
+        await newInvoice.save();
 
-            if (!accountantProfile) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Invalid accountant ID'
-                });
-            }
-        }
+        await process.updateStatus(PROCESS_STATUS.INVOICE_PENDING, req.user, 'Invoice created.');
 
-        // Create invoice
-        const invoice = await Invoice.createInvoice({
-            applicationId,
-            accountantId: accountantId || null,
-            paymentType,
-            amount,
-            currency: currency || CURRENCY.USD,
-            breakdown: breakdown || [],
-            dueDate: dueDate || null,
-            notes: notes || null
-        });
-
-        // Update application status if needed
-        if (application.status === APPLICATION_STATUS.GATHERING_INFO) {
-            await application.updateStatus(APPLICATION_STATUS.INVOICE_PENDING, consultantId, 'Invoice created');
-        }
-
-        return res.status(201).json({
-            success: true,
-            message: 'Invoice created successfully',
-            data: { invoice }
-        });
+        res.status(201).json({ success: true, message: 'Invoice created successfully', data: newInvoice });
 
     } catch (error) {
-        console.error('Create invoice error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to create invoice',
-            error: error.message
-        });
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+        res.status(500).json({ success: false, message: 'Failed to create invoice', error: error.message });
     }
 });
 
-/**
- * GET /api/consultant/applications/:applicationId/invoices
- * Get invoices for application
- */
-router.get('/applications/:applicationId/invoices', requireConsultant, async (req, res) => {
-    try {
-        const { applicationId } = req.params;
-        const consultantId = req.user._id;
-
-        // Verify application
-        const application = await Application.findOne({
-            _id: applicationId,
-            consultantId,
-            deletedAt: null
-        });
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
-        }
-
-        const invoices = await Invoice.find({
-            applicationId,
-            deletedAt: null
-        })
-            .populate('accountantId', 'firstName lastName email')
-            .sort({ issuedAt: -1 });
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                count: invoices.length,
-                invoices
-            }
-        });
-
-    } catch (error) {
-        console.error('Get invoices error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch invoices',
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/consultant/accountants
- * Get list of available accountants for invoice assignment
- */
+// Get all verified accountants
 router.get('/accountants', requireConsultant, async (req, res) => {
     try {
-        const accountantProfiles = await StaffProfile.find({
-            staffRole: STAFF_ROLE.ACCOUNTANT,
-            verificationStatus: 'VERIFIED',
-            deletedAt: null
-        }).populate('userId', 'firstName lastName email');
-
-        const accountants = accountantProfiles.map(profile => ({
-            id: profile.userId._id,
-            name: `${profile.userId.firstName} ${profile.userId.lastName}`,
-            email: profile.userId.email
-        }));
-
-        return res.status(200).json({
-            success: true,
-            data: { accountants }
-        });
-
+        const accountants = await StaffProfile.find({ staffRole: ACCOUNTANT_ROLE.ACCOUNTANT, verificationStatus: 'VERIFIED' }).populate('user', 'firstName lastName email phone');
+        res.status(200).json({ success: true, data: accountants });
     } catch (error) {
-        console.error('Get accountants error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch accountants',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Failed to fetch accountants', error: error.message });
     }
 });
 
-// ============================================
-// TASKS
-// ============================================
-
-/**
- * POST /api/consultant/applications/:applicationId/tasks
- * Create task for application
- */
-router.post('/applications/:applicationId/tasks', requireConsultant, async (req, res) => {
+// Get all verified agents
+router.get('/agents', requireConsultant, async (req, res) => {
     try {
-        const { applicationId } = req.params;
-        const consultantId = req.user._id;
-        const {
-            title,
-            description,
-            priority,
-            visibleToStudent,
-            assignedTo,
-            dueDate
-        } = req.body;
-
-        if (!title) {
-            return res.status(400).json({
-                success: false,
-                message: 'Task title is required'
-            });
-        }
-
-        // Verify application
-        const application = await Application.findOne({
-            _id: applicationId,
-            consultantId,
-            deletedAt: null
-        });
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
-        }
-
-        // Check if invoices are paid (at least one approved)
-        const approvedInvoice = await Invoice.findOne({
-            applicationId,
-            status: INVOICE_STATUS.APPROVED,
-            deletedAt: null
-        });
-
-        if (!approvedInvoice) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot create tasks until at least one invoice is approved'
-            });
-        }
-
-        const task = await Task.create({
-            applicationId,
-            title,
-            description: description || null,
-            status: TASK_STATUS.PENDING,
-            priority: priority || TASK_PRIORITY.MEDIUM,
-            visibleToStudent: visibleToStudent !== false,
-            createdBy: consultantId,
-            assignedTo: assignedTo || application.studentId,
-            dueDate: dueDate || null
-        });
-
-        return res.status(201).json({
-            success: true,
-            message: 'Task created successfully',
-            data: { task }
-        });
-
+        const agents = await StaffProfile.find({ staffRole: STAFF_ROLE.AGENT, verificationStatus: 'VERIFIED' }).populate('user', 'firstName lastName email phone');
+        res.status(200).json({ success: true, data: agents });
     } catch (error) {
-        console.error('Create task error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to create task',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Failed to fetch agents', error: error.message });
     }
 });
 
-/**
- * GET /api/consultant/applications/:applicationId/tasks
- * Get tasks for application
- */
-router.get('/applications/:applicationId/tasks', requireConsultant, async (req, res) => {
+// Assign an agent to a process
+router.patch('/processes/:processId/assign-agent', requireConsultant, async (req, res) => {
     try {
-        const { applicationId } = req.params;
-        const consultantId = req.user._id;
+        const { processId } = req.params;
+        const { agentId } = req.body;
+        const process = await Process.findById(processId);
 
-        // Verify application
-        const application = await Application.findOne({
-            _id: applicationId,
-            consultantId,
-            deletedAt: null
-        });
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
+        if (!process || process.consultantId.toString() !== req.user.staffProfile._id.toString()) {
+            return res.status(404).json({ success: false, message: 'Process not found or not assigned to you.' });
         }
 
-        const tasks = await Task.find({
-            applicationId,
-            deletedAt: null
-        })
-            .populate('assignedTo', 'firstName lastName email')
-            .sort({ dueDate: 1, createdAt: -1 });
+        const agentTasks = await Task.findOne({ processId, createdBy: process.agentId });
+        if (agentTasks) {
+            return res.status(400).json({ success: false, message: 'Cannot change agent after they have created a task.' });
+        }
 
-        return res.status(200).json({
-            success: true,
-            data: {
-                count: tasks.length,
-                tasks
-            }
-        });
-
+        process.agentId = agentId;
+        await process.save();
+        res.status(200).json({ success: true, message: 'Agent assigned successfully.', data: process });
     } catch (error) {
-        console.error('Get tasks error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch tasks',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Failed to assign agent', error: error.message });
     }
 });
 
-/**
- * PUT /api/consultant/tasks/:taskId
- * Update task
- */
-router.put('/tasks/:taskId', requireConsultant, async (req, res) => {
+// Create a task for a process
+router.post('/processes/:processId/tasks', requireConsultant, async (req, res) => {
     try {
-        const { taskId } = req.params;
-        const consultantId = req.user._id;
+        const { processId } = req.params;
+        const taskData = { processId, createdBy: req.user._id, ...req.body };
+        const newTask = new Task(taskData);
+        await newTask.save();
 
-        const task = await Task.findOne({
-            _id: taskId,
-            deletedAt: null
-        }).populate('applicationId', 'consultantId');
-
-        if (!task) {
-            return res.status(404).json({
-                success: false,
-                message: 'Task not found'
-            });
+        if (req.body.documentType) {
+            const docData = {
+                taskId: newTask._id,
+                documentType: req.body.documentType,
+                name: req.body.documentName || req.body.documentType,
+            };
+            const newDoc = new Document(docData);
+            await newDoc.save();
         }
 
-        // Verify consultant owns the application
-        if (task.applicationId.consultantId.toString() !== consultantId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'Access denied'
-            });
-        }
-
-        const {
-            title,
-            description,
-            status,
-            priority,
-            visibleToStudent,
-            assignedTo,
-            dueDate,
-            completionNotes,
-            cancellationReason
-        } = req.body;
-
-        if (title) task.title = title;
-        if (description !== undefined) task.description = description;
-        if (priority) task.priority = priority;
-        if (visibleToStudent !== undefined) task.visibleToStudent = visibleToStudent;
-        if (assignedTo !== undefined) task.assignedTo = assignedTo;
-        if (dueDate !== undefined) task.dueDate = dueDate;
-
-        // Handle status changes
-        if (status && status !== task.status) {
-            switch (status) {
-                case TASK_STATUS.IN_PROGRESS:
-                    await task.start();
-                    break;
-                case TASK_STATUS.COMPLETED:
-                    await task.complete(completionNotes);
-                    break;
-                case TASK_STATUS.CANCELLED:
-                    await task.cancel(cancellationReason);
-                    break;
-                default:
-                    task.status = status;
-                    await task.save();
-            }
-        } else {
-            await task.save();
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: 'Task updated successfully',
-            data: { task }
-        });
-
+        res.status(201).json({ success: true, message: 'Task created successfully', data: newTask });
     } catch (error) {
-        console.error('Update task error:', error);
-        return res.status(400).json({
-            success: false,
-            message: error.message || 'Failed to update task'
-        });
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+        res.status(500).json({ success: false, message: 'Failed to create task', error: error.message });
     }
 });
 
-/**
- * DELETE /api/consultant/tasks/:taskId
- * Delete task
- */
-router.delete('/tasks/:taskId', requireConsultant, async (req, res) => {
-    try {
-        const { taskId } = req.params;
-        const consultantId = req.user._id;
-
-        const task = await Task.findOne({
-            _id: taskId,
-            deletedAt: null
-        }).populate('applicationId', 'consultantId');
-
-        if (!task) {
-            return res.status(404).json({
-                success: false,
-                message: 'Task not found'
-            });
-        }
-
-        if (task.applicationId.consultantId.toString() !== consultantId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'Access denied'
-            });
-        }
-
-        await task.softDelete();
-
-        return res.status(200).json({
-            success: true,
-            message: 'Task deleted successfully'
-        });
-
-    } catch (error) {
-        console.error('Delete task error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to delete task',
-            error: error.message
-        });
-    }
-});
-
-// ============================================
-// DOCUMENTS
-// ============================================
-
-/**
- * POST /api/consultant/applications/:applicationId/documents
- * Request document from student
- */
-router.post('/applications/:applicationId/documents', requireConsultant, async (req, res) => {
-    try {
-        const { applicationId } = req.params;
-        const consultantId = req.user._id;
-        const {
-            documentType,
-            name,
-            description,
-            taskId,
-            visibleToStudent,
-            expiryDate
-        } = req.body;
-
-        if (!documentType || !name) {
-            return res.status(400).json({
-                success: false,
-                message: 'Document type and name are required'
-            });
-        }
-
-        // Verify application
-        const application = await Application.findOne({
-            _id: applicationId,
-            consultantId,
-            deletedAt: null
-        });
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
-        }
-
-        const document = await Document.createRequest({
-            applicationId,
-            documentType,
-            name,
-            description: description || null,
-            taskId: taskId || null,
-            visibleToStudent: visibleToStudent !== false
-        });
-
-        if (expiryDate) {
-            document.expiryDate = expiryDate;
-            await document.save();
-        }
-
-        return res.status(201).json({
-            success: true,
-            message: 'Document request created successfully',
-            data: { document }
-        });
-
-    } catch (error) {
-        console.error('Request document error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to create document request',
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/consultant/applications/:applicationId/documents
- * Get documents for application
- */
-router.get('/applications/:applicationId/documents', requireConsultant, async (req, res) => {
-    try {
-        const { applicationId } = req.params;
-        const consultantId = req.user._id;
-
-        // Verify application
-        const application = await Application.findOne({
-            _id: applicationId,
-            consultantId,
-            deletedAt: null
-        });
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
-        }
-
-        const documents = await Document.find({
-            applicationId,
-            deletedAt: null
-        })
-            .populate('uploadedBy', 'firstName lastName')
-            .populate('verifiedBy', 'firstName lastName')
-            .sort({ createdAt: -1 });
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                count: documents.length,
-                documents
-            }
-        });
-
-    } catch (error) {
-        console.error('Get documents error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch documents',
-            error: error.message
-        });
-    }
-});
-
-/**
- * POST /api/consultant/documents/:documentId/upload
- * Upload document on behalf of student (walk-in scenario)
- */
-router.post('/documents/:documentId/upload', requireConsultant, uploadSingle('document'), async (req, res) => {
+// Review a document
+router.patch('/documents/:documentId/review', requireConsultant, async (req, res) => {
     try {
         const { documentId } = req.params;
-        const consultantId = req.user._id;
-
-        const document = await Document.findOne({
-            _id: documentId,
-            deletedAt: null
-        }).populate('applicationId', 'consultantId');
-
-        if (!document) {
-            return res.status(404).json({
-                success: false,
-                message: 'Document not found'
-            });
-        }
-
-        if (document.applicationId.consultantId.toString() !== consultantId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'Access denied'
-            });
-        }
-
-        if (!req.fileInfo) {
-            return res.status(400).json({
-                success: false,
-                message: 'No file uploaded'
-            });
-        }
-
-        await document.upload(consultantId, {
-            filePath: req.fileInfo.path,
-            fileName: req.fileInfo.name,
-            fileSize: req.fileInfo.size,
-            mimeType: req.fileInfo.mimeType
-        });
-
-        return res.status(200).json({
-            success: true,
-            message: 'Document uploaded successfully',
-            data: { document }
-        });
-
+        const { status, notes } = req.body;
+        const doc = await Document.findById(documentId);
+        // TODO: Add validation to ensure consultant can only review documents for their processes
+        await doc.review(req.user._id, status, notes);
+        res.status(200).json({ success: true, message: `Document status updated to ${status}` });
     } catch (error) {
-        console.error('Upload document error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to upload document',
-            error: error.message
-        });
+        res.status(400).json({ success: false, message: error.message });
     }
 });
 
-/**
- * PUT /api/consultant/documents/:documentId/verify
- * Verify document
- */
-router.put('/documents/:documentId/verify', requireConsultant, async (req, res) => {
-    try {
-        const { documentId } = req.params;
-        const { notes } = req.body;
-        const consultantId = req.user._id;
-
-        const document = await Document.findOne({
-            _id: documentId,
-            deletedAt: null
-        }).populate('applicationId', 'consultantId');
-
-        if (!document) {
-            return res.status(404).json({
-                success: false,
-                message: 'Document not found'
-            });
-        }
-
-        if (document.applicationId.consultantId.toString() !== consultantId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'Access denied'
-            });
-        }
-
-        await document.verify(consultantId, notes);
-
-        return res.status(200).json({
-            success: true,
-            message: 'Document verified successfully',
-            data: { document }
-        });
-
-    } catch (error) {
-        console.error('Verify document error:', error);
-        return res.status(400).json({
-            success: false,
-            message: error.message || 'Failed to verify document'
-        });
-    }
-});
-
-/**
- * PUT /api/consultant/documents/:documentId/reject
- * Reject document
- */
-router.put('/documents/:documentId/reject', requireConsultant, async (req, res) => {
-    try {
-        const { documentId } = req.params;
-        const { reason } = req.body;
-        const consultantId = req.user._id;
-
-        if (!reason) {
-            return res.status(400).json({
-                success: false,
-                message: 'Rejection reason is required'
-            });
-        }
-
-        const document = await Document.findOne({
-            _id: documentId,
-            deletedAt: null
-        }).populate('applicationId', 'consultantId');
-
-        if (!document) {
-            return res.status(404).json({
-                success: false,
-                message: 'Document not found'
-            });
-        }
-
-        if (document.applicationId.consultantId.toString() !== consultantId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'Access denied'
-            });
-        }
-
-        await document.reject(consultantId, reason);
-
-        return res.status(200).json({
-            success: true,
-            message: 'Document rejected',
-            data: { document }
-        });
-
-    } catch (error) {
-        console.error('Reject document error:', error);
-        return res.status(400).json({
-            success: false,
-            message: error.message || 'Failed to reject document'
-        });
-    }
-});
-
-// ============================================
-// DASHBOARD & STATISTICS
-// ============================================
-
-/**
- * GET /api/consultant/dashboard
- * Get consultant dashboard summary
- */
-router.get('/dashboard', requireConsultant, async (req, res) => {
-    try {
-        const consultantId = req.staffProfile._id;
-
-        // Pending initials assigned to consultant
-        const pendingInitials = await Initial.countDocuments({
-            assignedConsultantId: consultantId,
-            status: INITIAL_STATUS.APPROVED
-        });
-
-        // Applications by status
-        const applications = await Application.find({
-            consultantId,
-            deletedAt: null
-        }).select('status targetCountry');
-
-        const statusCounts = {};
-        applications.forEach(app => {
-            statusCounts[app.status] = (statusCounts[app.status] || 0) + 1;
-        });
-
-        // Pending invoices (not yet approved)
-        const pendingInvoices = await Invoice.countDocuments({
-            applicationId: { $in: applications.map(a => a._id) },
-            status: { $nin: [INVOICE_STATUS.APPROVED, INVOICE_STATUS.CANCELLED] },
-            deletedAt: null
-        });
-
-        // Pending tasks
-        const pendingTasks = await Task.countDocuments({
-            applicationId: { $in: applications.map(a => a._id) },
-            status: { $in: [TASK_STATUS.PENDING, TASK_STATUS.IN_PROGRESS] },
-            deletedAt: null
-        });
-
-        // Pending documents
-        const pendingDocuments = await Document.countDocuments({
-            applicationId: { $in: applications.map(a => a._id) },
-            status: { $in: [DOCUMENT_STATUS.PENDING, DOCUMENT_STATUS.UPLOADED] },
-            deletedAt: null
-        });
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                consultant: {
-                    name: `${req.user.firstName} ${req.user.lastName}`,
-                    assignedCountries: countries
-                },
-                summary: {
-                    pendingInitials,
-                    totalApplications: applications.length,
-                    applicationsByStatus: statusCounts,
-                    pendingInvoices,
-                    pendingTasks,
-                    pendingDocuments
-                }
-            }
-        });
-
-    } catch (error) {
-        console.error('Get dashboard error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch dashboard',
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/consultant/stats
- * Get detailed statistics
- */
-router.get('/stats', requireConsultant, async (req, res) => {
-    try {
-        const consultantId = req.user._id;
-        const { startDate, endDate } = req.query;
-
-        const dateFilter = {};
-        if (startDate) dateFilter.$gte = new Date(startDate);
-        if (endDate) dateFilter.$lte = new Date(endDate);
-
-        const applicationMatch = {
-            consultantId: new mongoose.Types.ObjectId(consultantId),
-            deletedAt: null
-        };
-        if (Object.keys(dateFilter).length > 0) {
-            applicationMatch.createdAt = dateFilter;
-        }
-
-        // Applications by country
-        const byCountry = await Application.aggregate([
-            { $match: applicationMatch },
-            { $group: { _id: '$targetCountry', count: { $sum: 1 } } },
-            { $sort: { count: -1 } }
-        ]);
-
-        // Applications by status
-        const byStatus = await Application.aggregate([
-            { $match: applicationMatch },
-            { $group: { _id: '$status', count: { $sum: 1 } } }
-        ]);
-
-        // Revenue (approved invoices)
-        const applicationIds = await Application.find(applicationMatch).distinct('_id');
-
-        const revenue = await Invoice.aggregate([
-            {
-                $match: {
-                    applicationId: { $in: applicationIds },
-                    status: INVOICE_STATUS.APPROVED,
-                    deletedAt: null
-                }
-            },
-            {
-                $group: {
-                    _id: '$currency',
-                    total: { $sum: '$amount' },
-                    count: { $sum: 1 }
-                }
-            }
-        ]);
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                byCountry,
-                byStatus,
-                revenue
-            }
-        });
-
-    } catch (error) {
-        console.error('Get stats error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch statistics',
-            error: error.message
-        });
-    }
-});
 
 export default router;

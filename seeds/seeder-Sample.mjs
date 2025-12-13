@@ -21,9 +21,9 @@ import { USER_ROLE, USER_STATUS, USER_SOURCE } from '../models/Users/_UsersMain.
 import { STAFF_ROLE, STAFF_VERIFICATION_STATUS } from '../models/Users/StaffProfile.mjs';
 import { GENDER, EDUCATION_LEVEL, ENGLISH_TEST } from '../models/Users/Student.mjs';
 import { INITIAL_SOURCE, INITIAL_STATUS } from '../models/initial/Initial.mjs';
-import { APPLICATION_STATUS, INTAKE_PREFERENCE, CURRENCY } from '../models/Process/Process.mjs';
+import { PROCESS_STATUS, INTAKE_PREFERENCE, CURRENCY } from '../models/Process/Process.mjs';
 import { INVOICE_STATUS, INVOICE_PAYMENT_TYPE } from '../models/Invoice/Invoice.mjs';
-import { TASK_STATUS, TASK_PRIORITY } from '../models/Task/Tasks.mjs';
+import { TASK_STATUS } from '../models/Task/Tasks.mjs';
 import { DOCUMENT_TYPE, DOCUMENT_STATUS } from '../models/Docx/Document.mjs';
 
 import { GREEN, RED, RESET, YELLOW, BLUE, CYAN, X, T, P } from '../config/constants.mjs';
@@ -261,7 +261,7 @@ async function seedApplication() {
             amount: 40000,
             currency: CURRENCY.GBP
         },
-        status: APPLICATION_STATUS.INVOICE_PENDING
+        status: PROCESS_STATUS.INVOICE_PENDING
     });
 
     createdData.application = application;
@@ -325,7 +325,6 @@ async function seedTasks() {
             title: 'Finalize Statement of Purpose',
             description: 'Review and finalize the SOP draft.',
             status: TASK_STATUS.IN_PROGRESS,
-            priority: TASK_PRIORITY.HIGH,
             createdBy: consultant._id,
             assignedTo: student._id,
             visibleToStudent: true,
@@ -336,7 +335,6 @@ async function seedTasks() {
             title: 'Verify Financial Documents',
             description: 'Internal verification of submitted bank statements.',
             status: TASK_STATUS.PENDING,
-            priority: TASK_PRIORITY.MEDIUM,
             createdBy: consultant._id,
             assignedTo: consultant._id,
             visibleToStudent: false

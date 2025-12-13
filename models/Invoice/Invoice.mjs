@@ -11,6 +11,7 @@ export const INVOICE_STATUS = Object.freeze({
     STUDENT_CONTACTED: 'STUDENT_CONTACTED',  // Accountant has contacted student
     PAYMENT_RECEIVED: 'PAYMENT_RECEIVED',    // Payment info recorded by student/accountant
     APPROVED: 'APPROVED',             // Payment verified and approved
+    REJECTED: 'REJECTED',             // Payment rejected by accountant
     CANCELLED: 'CANCELLED'            // Invoice cancelled
 });
 
@@ -98,7 +99,7 @@ invoiceSchema.virtual('isOverdue').get(function () {
 // INSTANCE METHODS
 // ============================================
 
-const editableStatuses = [INVOICE_STATUS.PENDING, INVOICE_STATUS.STUDENT_CONTACTED, INVOICE_STATUS.PAYMENT_RECEIVED];
+const editableStatuses = [INVOICE_STATUS.PENDING, INVOICE_STATUS.STUDENT_CONTACTED, INVOICE_STATUS.PAYMENT_RECEIVED, INVOICE_STATUS.REJECTED];
 
 invoiceSchema.methods.updateStatus = function (newStatus, user, reason = null) {
     if (!Object.values(INVOICE_STATUS).includes(newStatus)) {
@@ -120,7 +121,7 @@ invoiceSchema.methods.updateStatus = function (newStatus, user, reason = null) {
     }
 
     this.status = newStatus;
-    if (newStatus === INVOICE_STATUS.APPROVED || newStatus === INVOICE_STATUS.CANCELLED) {
+    if (newStatus === INVOICE_STATUS.APPROVED || newStatus === INVOICE_STATUS.CANCELLED || newStatus === INVOICE_STATUS.REJECTED) {
         this.reviewedAt = new Date();
         this.reviewedBy = user._id;
         if (reason) {

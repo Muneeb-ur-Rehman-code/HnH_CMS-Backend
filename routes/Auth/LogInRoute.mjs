@@ -2,7 +2,7 @@
 import express from 'express';
 import User from '../../models/Users/_UsersMain.mjs';
 import StaffProfile from '../../models/Users/StaffProfile.mjs';
-import { generateToken } from '../../middlewares/jwt.mjs';
+import { generateToken, decodeToken, verifyToken } from '../../middlewares/jwt.mjs';
 import { USER_STATUS, USER_ROLE } from '../../models/Users/_UsersMain.mjs';
 
 const router = express.Router();
@@ -120,6 +120,52 @@ router.post('/logout', (req, res) => {
         success: true,
         message: 'Logout successful. Please clear your token.'
     });
+});
+
+// /api/auth/debug-token - Debug endpoint to verify token
+router.post('/debug-token', (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token is required'
+            });
+        }
+
+        const decoded = decodeToken(token);
+
+        if (!decoded) {
+            return res.status(400).json({
+                success: false,
+                message: 'Could not decode token'
+            });
+        }
+
+        try {
+            const verified = verifyToken(token);
+            return res.status(200).json({
+                success: true,
+                message: 'Token is valid',
+                decoded,
+                verified
+            });
+        } catch (verifyError) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token verification failed',
+                decoded,
+                error: verifyError.message
+            });
+        }
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: 'Error processing token',
+            error: error.message
+        });
+    }
 });
 
 export default router;

@@ -209,6 +209,7 @@ const createUsers = async () => {
         },
         emailOtp: { ...generateOtp(), verified: true }
     });
+    admin.staffRole = 'ADMIN';
     users.push(admin);
 
     // Create managers
@@ -228,6 +229,7 @@ const createUsers = async () => {
             },
             emailOtp: { ...generateOtp(), verified: true }
         });
+        manager.staffRole = 'MANAGER';
         users.push(manager);
     }
 
@@ -248,10 +250,11 @@ const createUsers = async () => {
             },
             emailOtp: { ...generateOtp(), verified: true }
         });
+        consultant.staffRole = 'CONSULTANT';
         users.push(consultant);
     }
 
-    // Create other staff (accountant, receptionist, agent)
+
     const staffRoles = ['ACCOUNTANT', 'RECEPTIONIST', 'AGENT'];
     let staffCounter = 0;
     for (const role of staffRoles) {
@@ -272,9 +275,11 @@ const createUsers = async () => {
                 },
                 emailOtp: { ...generateOtp(), verified: true }
             });
+            staff.staffRole = role;
             users.push(staff);
         }
     }
+
 
     // Create students (some with password, some without)
     for (let i = 1; i <= 20; i++) {
@@ -314,53 +319,30 @@ const createStaffProfiles = async (users) => {
     console.log(`\n${CYAN}${A} Creating staff profiles...${RESET}`);
     const staffProfiles = [];
 
-    // Get staff users (skip first user which is admin)
+    // Get staff users (who now have the temporary 'staffRole' property)
     const staffUsers = users.filter(u => u.role === 'STAFF');
 
-    // Admin
-    const admin = await StaffProfile.create({
-        userId: staffUsers[0]._id,
-        staffRole: 'ADMIN',
-        verificationStatus: 'VERIFIED'
-    });
-    staffProfiles.push(admin);
+    // Create a StaffProfile for every staff user using the attached staffRole
+    for (const user of staffUsers) {
+        const role = user.staffRole;
 
-    // Managers
-    for (let i = 1; i <= 2; i++) {
-        const manager = await StaffProfile.create({
-            userId: staffUsers[i]._id,
-            staffRole: 'MANAGER',
+        // This check ensures we only create a profile if the role was successfully attached
+        if (!role) {
+            console.warn(`Skipping staff profile creation for ${user.email}: staffRole property is missing.`);
+            continue;
+        }
+
+        const profile = await StaffProfile.create({
+            userId: user._id,
+            staffRole: role, // <-- CORRECTED: Directly use the attached role
             verificationStatus: 'VERIFIED'
         });
-        staffProfiles.push(manager);
-    }
-
-    // Consultants
-    for (let i = 3; i <= 9; i++) {
-        const consultant = await StaffProfile.create({
-            userId: staffUsers[i]._id,
-            staffRole: 'CONSULTANT',
-            verificationStatus: 'VERIFIED'
-        });
-        staffProfiles.push(consultant);
-    }
-
-    // Other staff
-    for (let i = 10; i < staffUsers.length; i++) {
-        const roles = ['ACCOUNTANT', 'RECEPTIONIST', 'AGENT'];
-        const role = roles[(i - 10) % roles.length];
-        const staff = await StaffProfile.create({
-            userId: staffUsers[i]._id,
-            staffRole: role,
-            verificationStatus: 'VERIFIED'
-        });
-        staffProfiles.push(staff);
+        staffProfiles.push(profile);
     }
 
     console.log(T + `${GREEN}Created ${staffProfiles.length} staff profiles${RESET}`);
     return staffProfiles;
 };
-
 /**
  * Create countries with consultants
  */
@@ -725,13 +707,13 @@ const generateHtmlTable = (title, data) => {
 
     // 1. Define fields to EXCLUDE from the table for clean reading
     const EXCLUDE_FIELDS = [
-         '__v', '_id', 'createdAt', 'updatedAt', 
+        '__v', '_id', 'createdAt', 'updatedAt',
         'emailOtp', 'phone', 'isNew', '$errors', 'activePaths', '_doc'
     ];
-    
+
     // 2. Extract and sanitize keys based on the first document's raw data
     const rawDoc = data[0]._doc || data[0];
-    const keys = Object.keys(rawDoc).filter(key => 
+    const keys = Object.keys(rawDoc).filter(key =>
         !EXCLUDE_FIELDS.includes(key) && key[0] !== '$'
     ).slice(0, 7); // Limit to 7 columns for better view on smaller screens
 
@@ -784,8 +766,8 @@ const generateHtmlTable = (title, data) => {
 // Main HTML Wrapper Function
 const wrapInHtml = (data) => {
     // Check if the data has the 'summary' property
-    const summary = data.summary || {}; 
-    
+    const summary = data.summary || {};
+
     let html = `
         <!DOCTYPE html>
         <html lang="en">

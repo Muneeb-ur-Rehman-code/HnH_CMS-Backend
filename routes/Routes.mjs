@@ -12,6 +12,7 @@ import CountryRoutes from './Gen/CountryRoutes.mjs';
 import UniversityRoutes from './Gen/UniversityRoutes.mjs';
 import ManagerRoutes from './Manager/ManagerRoutes.mjs';
 import AgentRoutes from './Agent/Agent.mjs';
+import AdminRoutes from './Admin/AdminRoutes.mjs';
 
 const router = express.Router();
 
@@ -31,6 +32,7 @@ router.use('/university', UniversityRoutes);
 router.use('/checkAccess', CheckRoute);
 router.use('/manager', ManagerRoutes);
 router.use('/agent', AgentRoutes);
+router.use('/admin', AdminRoutes);
 
 
 

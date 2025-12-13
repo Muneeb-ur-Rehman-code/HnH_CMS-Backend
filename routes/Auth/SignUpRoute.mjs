@@ -18,7 +18,8 @@ const requireActionToken = (req, res) => {
     }
 
     try {
-        const decoded = verifyToken(authHeader);
+        const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+        const decoded = verifyToken(token);
         return decoded;
     } catch (err) {
         res.status(401).json({ success: false, message: err.message || 'Invalid token' });
@@ -319,6 +320,19 @@ router.post('/set-password', async (req, res) => {
     } catch (error) {
         console.error('Set password error:', error);
 
+        if (error.message.includes('Password must be at least') ||
+            error.message.includes('Password must contain at least one')) {
+
+            // The error message from setPassword is a comma-separated string of validation issues.
+            const validationErrors = error.message.split(', ');
+
+            return res.status(400).json({
+                success: false,
+                message: 'The password does not meet the complexity requirements.',
+                errors: validationErrors
+            });
+        }
+
         // Handle validation errors
         if (error.name === 'ValidationError') {
             const messages = Object.values(error.errors).map(err => err.message);
@@ -331,6 +345,74 @@ router.post('/set-password', async (req, res) => {
         return res.status(500).json({
             success: false,
             message: 'Failed to set password',
+            error: error.message
+        });
+    }
+});
+
+// /api/auth/signup/set-password
+router.put('/change-password', attachUser, async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body || {};
+        const user = req.user;
+
+
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'oldPassword and newPassword are required'
+            });
+        }
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        await user.changePassword(oldPassword, newPassword);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Password changed successfully'
+        });
+
+
+    } catch (error) {
+        console.error('Change password error:', error);
+
+        if (error.message === 'Current password is incorrect') {
+            return res.status(403).json({
+                success: false,
+                message: error.message
+            });
+        }
+
+        if (error.message.includes('Password must be at least') ||
+            error.message.includes('Password must contain at least one')) {
+
+            // Format the list of errors for a cleaner response
+            const validationErrors = error.message.split(', ');
+
+            return res.status(400).json({
+                success: false,
+                message: 'The new password does not meet the complexity requirements',
+                errors: validationErrors
+            });
+        }
+
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(err => err.message);
+            return res.status(400).json({
+                success: false,
+                message: 'Validation failed during password change',
+                details: messages
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to change password',
             error: error.message
         });
     }
@@ -373,13 +455,7 @@ router.post('/send-phone-otp', async (req, res) => {
         }
 
 
-        // Update phone number if changed
-        if (user.phoneNumber !== phoneNumber) {
-            user.phoneNumber = phoneNumber;
-            user.phoneVerified = false;
-            await user.save();
-        }
-
+        
         // Send OTP (model method)
         const result = await user.setPhoneAndGenerateOtp(phoneNumber);
 
@@ -468,7 +544,7 @@ router.post('/verify-phone-otp', async (req, res) => {
             success: true,
             message: 'Phone verified successfully',
             data: {
-                phoneNumber: user.phoneNumber,
+                phoneNumber: result.user?.phone?.number || user.phone?.number || null,
                 phoneVerified: true
             }
         });
@@ -533,7 +609,7 @@ router.post('/resend-phone-otp', async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found or token mismatch' });
         }
 
-        if (!user.phoneNumber) {
+        if (!user.phone?.number) {
             return res.status(400).json({
                 success: false,
                 message: 'Phone number not set'
@@ -560,7 +636,7 @@ router.post('/resend-phone-otp', async (req, res) => {
         }
 
         // Send SMS
-        await sendOTPviaSMS(user.phoneNumber, result.otp);
+        await sendOTPviaSMS(user.phone.number, result.otp);
 
         return res.status(200).json({
             success: true,
@@ -615,7 +691,12 @@ router.delete('/del-phone', attachUser, async (req, res) => {
 
     }
     catch (error) {
-
+        console.error('Delete phone error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to delete phone number',
+            error: error.message
+        });
     }
 });
 

@@ -58,7 +58,10 @@ app.get(['/', '/health', '/health-check'], (req, res) => { res.json({ message: '
 app.get('/run-sample-seed', async (req, res) => {
     if (process.env.NODE_ENV !== 'development') return res.status(403).send(X + 'Forbidden');
     try {
-        await seedDatabase();
+        // const summarydata = await seedDatabase();
+        const { summary, Responce } = await seedDatabase({ exitOnFinish: false });
+        if(summary) console.log(summary);
+        res.status(200).send(Responce);
     } catch (e) {
         res.status(500).send(e.message);
     }

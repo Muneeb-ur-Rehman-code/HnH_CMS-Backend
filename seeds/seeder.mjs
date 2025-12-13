@@ -1,171 +1,212 @@
-// seeders/SeederStart.mjs
+// seeds/seeder.mjs
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-import readline from 'readline';
-import User from '../models/User.mjs';
-import { USER_ROLE, USER_STATUS, USER_SOURCE } from '../models/User.mjs';
-import { X, T, A, E, P } from "../config/constants.mjs"
+import 'dotenv/config';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
-dotenv.config({ quiet: true });
+// Import colors and styles
+import {
+    GREEN,
+    RED,
+    YELLOW,
+    BLUE,
+    RESET,
+    T,
+    X,
+    P,
+    A
+} from '../config/constants.mjs';
 
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
+// Import models
+import User from '../models/Users/_UsersMain.mjs';
+import StaffProfile, { STAFF_VERIFICATION_STATUS } from '../models/Users/StaffProfile.mjs';
 
-const question = (query) => new Promise((resolve) => rl.question(query, resolve));
-
-const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-};
-
-const validatePassword = (password) => {
-    // At least 8 characters, 1 uppercase, 1 lowercase, 1 number, 1 special char
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
-    return passwordRegex.test(password);
-};
-
-async function seedAdminAccount() {
+// ============================================
+// DATABASE CONNECTION
+// ============================================
+const connectDB = async () => {
     try {
-        console.log('\n╔════════════════════════════════════════════════════════╗');
-        console.log('║         ADMIN ACCOUNT SEEDER - Initial Setup          ║');
-        console.log('╚════════════════════════════════════════════════════════╝\n');
+        await mongoose.connect(process.env.MONGO_URI, {});
+        console.log(T + `${GREEN}Database Connected${RESET}`);
+        return true;
+    } catch (error) {
+        console.error(X + `${RED}Database Connection Error: ${error.message}${RESET}`);
+        process.exit(1);
+    }
+};
 
-        // Connect to database
-        const MONGO_URI = process.env.MONGO_URI;
+// ============================================
+// CONFIGURATION
+// ============================================
+const PASSWORD_SALT_ROUNDS = 12;
 
-        if (!MONGO_URI) {
-            console.error(X + 'ERROR: MONGO_URI not found in environment variables');
-            process.exit(1);
-        }
+const hashPassword = async (password) => {
+    return bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
+};
 
-        console.log(P + 'Connecting to database...');
-        await mongoose.connect(MONGO_URI);
-        console.log(T + ' Connected to database\n');
+const generateOtp = () => {
+    const code = '111111'; // Dev mode
+    const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    return { code, hashedCode, expiresAt };
+};
 
+// ============================================
+// SEED FUNCTION
+// ============================================
+
+/**
+ * Create or verify admin and manager accounts
+ * Requires password as parameter
+ */
+const createAdminAndManager = async (password) => {
+    console.log(`\n${BLUE}${A} Creating admin and manager accounts...${RESET}`);
+
+    try {
         // Check if admin already exists
-        const existingAdmin = await User.findOne({ role: USER_ROLE.ADMIN });
-
+        const existingAdmin = await User.findOne({ email: 'admin@hnh.com' });
         if (existingAdmin) {
-            console.log(E + 'WARNING: Admin account already exists!');
-            console.log(A + `Email: ${existingAdmin.email}`);
-            console.log(A + `Name: ${existingAdmin.firstName} ${existingAdmin.lastName || ''}`);
-            console.log(A + `Created: ${existingAdmin.createdAt}\n`);
-
-            const overwrite = await question('\n\nDo you want to create another admin account? (yes/no): ');
-
-            if (overwrite.toLowerCase() !== 'yes' && overwrite.toLowerCase() !== 'y') {
-                console.log('\n\n' + X + 'Seeding cancelled.');
-                await mongoose.disconnect();
-                rl.close();
-                process.exit(0);
-            }
-            console.log('');
+            console.log(X + `${RED}Admin account already exists. Skipping creation.${RESET}`);
+            return false;
         }
 
-        // Get email
-        let email = '';
-        while (!email) {
-            email = await question(A + 'Enter admin email: ');
-            email = email.trim().toLowerCase();
-
-            if (!validateEmail(email)) {
-                console.log(X + 'Invalid email format. Please try again.\n');
-                email = '';
-                continue;
-            }
-
-            // Check if email already exists
-            const existingUser = await User.findOne({ email });
-            if (existingUser) {
-                console.log(X + 'Email already exists in database. Please use a different email.\n');
-                email = '';
-                continue;
-            }
+        // Check if manager already exists
+        const existingManager = await User.findOne({ email: 'manager@hnh.com' });
+        if (existingManager) {
+            console.log(X + `${RED}Manager account already exists. Skipping creation.${RESET}`);
+            return false;
         }
 
-        // Get password
-        let password = '';
-        while (!password) {
-            password = await question(A + 'Enter admin password (min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char): ');
-
-            if (!validatePassword(password)) {
-                console.log(X + 'Password does not meet requirements. Please try again.\n');
-                console.log('   Requirements:');
-                console.log('   - At least 8 characters');
-                console.log('   - At least 1 uppercase letter');
-                console.log('   - At least 1 lowercase letter');
-                console.log('   - At least 1 number');
-                console.log('   - At least 1 special character (@$!%*?&#)\n');
-                password = '';
-                continue;
-            }
-
-            const confirmPassword = await question(A + 'Confirm password: ');
-            if (password !== confirmPassword) {
-                console.log(X + 'Passwords do not match. Please try again.\n');
-                password = '';
-            }
-        }
-
-        // Get first name
-        let firstName = '';
-        while (!firstName) {
-            firstName = await question(A + 'Enter first name: ');
-            firstName = firstName.trim();
-            if (!firstName) {
-                console.log(X + 'First name is required.\n');
-            }
-        }
-
-        // Get last name (optional)
-        const lastName = await question(A + 'Enter last name (optional): ');
-
-        console.log('\n\n' + P + 'Creating admin account...');
+        // Hash the provided password
+        const hashedPassword = await hashPassword(password);
 
         // Create admin user
         const admin = await User.create({
-            email,
-            password, // Will be hashed by pre-save hook
-            firstName,
-            lastName: lastName.trim() || null,
-            role: USER_ROLE.ADMIN,
-            status: USER_STATUS.ACTIVE,
-            source: USER_SOURCE.ONLINE,
-            emailVerified: true,
-            phoneVerified: true // Admin doesn't need phone verification for initial setup
+            email: 'admin@hnh.com',
+            password: hashedPassword,
+            firstName: 'Admin',
+            lastName: 'User',
+            role: 'STAFF',
+            status: 'ACTIVE',
+            source: 'ONLINE',
+            phone: {
+                number: '923001111111',
+                otp: { ...generateOtp(), verified: true }
+            },
+            emailOtp: { ...generateOtp(), verified: true }
         });
 
-        console.log('\n');
-        console.log('╔════════════════════════════════════════════════════════╗');
-        console.log('║              ' + T + ' ADMIN ACCOUNT CREATED!                 ║');
-        console.log('╚════════════════════════════════════════════════════════╝\n');
-        console.log(T + 'ADMIN CREDENTIALS:');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(A + `Email:      ${admin.email}`);
-        console.log(A + `Password:   ${password}`);
-        console.log(A + `Name:       ${admin.firstName} ${admin.lastName || ''}`);
-        console.log(A + `User ID:    ${admin._id}`);
-        console.log(A + `Created:    ${admin.createdAt}`);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-        console.log(E + 'IMPORTANT: Save these credentials in a secure location!\n');
+        // Create admin staff profile
+        const adminProfile = await StaffProfile.create({
+            userId: admin._id,
+            staffRole: 'ADMIN',
+            verificationStatus: STAFF_VERIFICATION_STATUS.VERIFIED
+        });
 
-        await mongoose.disconnect();
-        console.log(T + 'Disconnected from database');
-        console.log(T + ' Seeding completed successfully!\n');
+        console.log(T + `${GREEN}Admin account created and verified${RESET}`);
+        console.log(`   ${BLUE}Email: ${YELLOW}admin@hnh.com${RESET}`);
 
-        rl.close();
-        process.exit(0);
+        // Create manager user
+        const manager = await User.create({
+            email: 'manager@hnh.com',
+            password: hashedPassword,
+            firstName: 'Manager',
+            lastName: 'User',
+            role: 'STAFF',
+            status: 'ACTIVE',
+            source: 'ONLINE',
+            phone: {
+                number: '923001111112',
+                otp: { ...generateOtp(), verified: true }
+            },
+            emailOtp: { ...generateOtp(), verified: true }
+        });
 
+        // Create manager staff profile
+        const managerProfile = await StaffProfile.create({
+            userId: manager._id,
+            staffRole: 'MANAGER',
+            verificationStatus: STAFF_VERIFICATION_STATUS.VERIFIED
+        });
+
+        console.log(T + `${GREEN}Manager account created and verified${RESET}`);
+        console.log(`   ${BLUE}Email: ${YELLOW}manager@hnh.com${RESET}`);
+
+        console.log(`\n${YELLOW}${P} Password: ${YELLOW}${password}${RESET}`);
+
+        return true;
     } catch (error) {
-        console.error('\n' + X + 'ERROR during seeding:');
+        console.error(X + `${RED}Error creating accounts: ${error.message}${RESET}`);
+        throw error;
+    }
+};
+
+// ============================================
+// MAIN SEED FUNCTION
+// ============================================
+/**
+ * Seed admin and manager accounts
+ * @param {Object} options - Configuration options
+ * @param {string} options.password - Password for accounts (required)
+ * @param {boolean} options.exitOnFinish - Exit process when finished (default: false)
+ * @returns {Promise<boolean>} - Returns true if accounts were created, false otherwise
+ */
+const seedDatabase = async (options = {}) => {
+    const { password, exitOnFinish = false } = options;
+
+    try {
+        console.log(`\n${GREEN}${'='.repeat(60)}${RESET}`);
+        console.log(`${GREEN}HNH CMS - ADMIN & MANAGER SEEDER${RESET}`);
+        console.log(`${GREEN}${'='.repeat(60)}${RESET}`);
+
+        if (!password) {
+            console.error(X + `${RED}Password is required as a configuration option${RESET}`);
+            if (exitOnFinish) process.exit(1);
+            throw new Error('Password is required');
+        }
+
+        // Connect to database
+        await connectDB();
+
+        // Create accounts
+        const created = await createAdminAndManager(password);
+
+        if (created) {
+            console.log(`\n${T}${GREEN}Seeding completed successfully!${RESET}\n`);
+        } else {
+            console.log(`\n${P}${YELLOW}No new accounts were created (accounts may already exist)${RESET}\n`);
+        }
+
+        // Close database connection
+        await mongoose.connection.close();
+
+        if (exitOnFinish) process.exit(0);
+        return created;
+    } catch (error) {
+        console.error(X + `${RED}Seeding failed: ${error.message}${RESET}`);
         console.error(error);
-        await mongoose.disconnect();
-        rl.close();
+        if (exitOnFinish) process.exit(1);
+        throw error;
+    }
+};
+
+// ============================================
+// EXPORTS
+// ============================================
+export { seedDatabase };
+export default seedDatabase;
+
+// ============================================
+// DIRECT EXECUTION
+// ============================================
+// If this file is run directly from the command line, run with process exit handling
+if (process.argv[1] === import.meta.url.replace('file://', '').replace(/\\/g, '/').split('/').join('\\')) {
+    const password = process.argv[2];
+    if (!password) {
+        console.error(X + `${RED}Password is required as a command-line argument${RESET}`);
+        console.log(`\n${YELLOW}Usage: node seeds/seeder.mjs <password>${RESET}`);
+        console.log(`${YELLOW}Example: node seeds/seeder.mjs MySecurePassword@123${RESET}\n`);
         process.exit(1);
     }
+    seedDatabase({ password, exitOnFinish: true });
 }
-
-// Run seeder
-seedAdminAccount();

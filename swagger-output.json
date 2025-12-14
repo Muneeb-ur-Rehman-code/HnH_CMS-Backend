@@ -1350,51 +1350,12 @@
         }
       }
     },
-    "/student/processes": {
-      "get": {
-        "description": "",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "500": {
-            "description": "Internal Server Error"
-          }
-        }
-      }
-    },
-    "/student/processes/{processId}": {
-      "get": {
-        "description": "",
-        "parameters": [
-          {
-            "name": "processId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "500": {
-            "description": "Internal Server Error"
-          }
-        }
-      }
-    },
-    "/student/processes/{processId}/cancel": {
+    "/student/applications/{applicationId}/cancel": {
       "patch": {
         "description": "",
         "parameters": [
           {
-            "name": "processId",
+            "name": "applicationId",
             "in": "path",
             "required": true,
             "schema": {
@@ -1451,89 +1412,6 @@
           },
           "404": {
             "description": "Not Found"
-          }
-        }
-      }
-    },
-    "/student/processes/{processId}/tasks": {
-      "get": {
-        "description": "",
-        "parameters": [
-          {
-            "name": "processId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "500": {
-            "description": "Internal Server Error"
-          }
-        }
-      }
-    },
-    "/student/processes/{processId}/documents": {
-      "get": {
-        "description": "",
-        "parameters": [
-          {
-            "name": "processId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "500": {
-            "description": "Internal Server Error"
-          }
-        }
-      }
-    },
-    "/student/documents/{documentId}/upload": {
-      "post": {
-        "description": "",
-        "parameters": [
-          {
-            "name": "documentId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          }
-        },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "filePath": {
-                    "example": "any"
-                  }
-                }
-              }
-            }
           }
         }
       }

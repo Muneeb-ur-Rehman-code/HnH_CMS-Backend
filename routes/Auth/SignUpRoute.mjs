@@ -1,6 +1,7 @@
 // routes/auth/signup.mjs
 import express from 'express';
 import User from '../../models/Users/_UsersMain.mjs';
+import StudentProfile from '../../models/Users/Student.mjs';
 import { sendOTPEmail } from '../../utils/emailService.mjs';
 import { sendOTPviaSMS } from '../../utils/smsService.mjs';
 import { optionalAttachUser } from '../../middlewares/Auth.mjs';
@@ -303,6 +304,15 @@ router.post('/set-password', async (req, res) => {
         await user.setPassword(password);
         // await user.save();
 
+        // Auto-create blank student profile if it doesn't exist (for student role)
+        if (user.role === 'STUDENT') {
+            let studentProfile = await StudentProfile.findOne({ userId: user._id });
+            if (!studentProfile) {
+                studentProfile = new StudentProfile({ userId: user._id });
+                await studentProfile.save();
+            }
+        }
+
         // Issue a normal auth token (uses default expiry from env/JWT_EXPIRY)
         const authToken = generateToken({ userId: user._id.toString() });
 
@@ -455,7 +465,7 @@ router.post('/send-phone-otp', async (req, res) => {
         }
 
 
-        
+
         // Send OTP (model method)
         const result = await user.setPhoneAndGenerateOtp(phoneNumber);
 

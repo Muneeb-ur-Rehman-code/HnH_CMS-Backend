@@ -3,7 +3,7 @@ import express from 'express';
 import User from '../../models/Users/_UsersMain.mjs';
 import StudentProfile from '../../models/Users/Student.mjs';
 import Initial from '../../models/initial/Initial.mjs';
-import Application from '../../models/Process/Process.mjs';
+import Application, { PROCESS_STATUS } from '../../models/Process/Process.mjs';
 import Invoice from '../../models/Invoice/Invoice.mjs';
 import Task from '../../models/Task/Tasks.mjs';
 import Document from '../../models/Docx/Document.mjs';
@@ -227,7 +227,7 @@ router.post('/initials', requireStudent, async (req, res) => {
                 message: 'Please complete your profile verification (email, password, phone) before creating an initial application.'
             });
         }
-        
+
         const studentProfile = await StudentProfile.findOne({ userId: user._id });
         if (!studentProfile) {
             return res.status(400).json({
@@ -436,7 +436,9 @@ router.get('/applications/:applicationId', requireStudent, async (req, res) => {
             _id: applicationId,
             studentId: user._id,
             deletedAt: null
-        }).populate('consultantId', 'email firstName lastName phoneNumber');
+        })
+            .populate('consultantId', 'email firstName lastName phoneNumber')
+            .populate('initial');
 
         if (!application) {
             return res.status(404).json({
@@ -444,6 +446,9 @@ router.get('/applications/:applicationId', requireStudent, async (req, res) => {
                 message: 'Application not found'
             });
         }
+
+        // Include related invoices for the application
+        const invoices = await Invoice.find({ applicationId: application._id, deletedAt: null }).sort({ issuedAt: -1 });
 
         return res.status(200).json({
             success: true,
@@ -462,6 +467,19 @@ router.get('/applications/:applicationId', requireStudent, async (req, res) => {
                         email: application.consultantId.email,
                         phone: application.consultantId.phoneNumber
                     } : null,
+                    initial: application.initial || null,
+                    invoices: invoices.map(inv => ({
+                        id: inv._id,
+                        invoiceNumber: inv.invoiceNumber,
+                        amount: inv.amount,
+                        currency: inv.currency,
+                        paymentType: inv.paymentType,
+                        status: inv.status,
+                        breakdown: inv.breakdown,
+                        dueDate: inv.dueDate,
+                        issuedAt: inv.issuedAt,
+                        approvedAt: inv.approvedAt
+                    })),
                     createdAt: application.createdAt,
                     updatedAt: application.updatedAt
                 }
@@ -709,103 +727,36 @@ router.post('/applications/:applicationId/documents/:documentId/upload', require
     }
 });
 
-// Student routes for processes and invoices
-router.get('/processes', requireStudent, async (req, res) => {
+// Application-specific actions merged from legacy "processes" routes
+router.patch('/applications/:applicationId/cancel', requireStudent, async (req, res) => {
     try {
-        const studentProfile = await StudentProfile.findOne({ userId: req.user._id });
-        if (!studentProfile) {
-            return res.status(200).json({ success: true, data: [] });
-        }
-        const processes = await Process.find({ studentId: studentProfile._id }).populate('consultant').populate('initial');
-        res.status(200).json({ success: true, data: processes });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to fetch processes', error: error.message });
-    }
-});
-
-router.get('/processes/:processId', requireStudent, async (req, res) => {
-    try {
-        const { processId } = req.params;
-        const studentProfile = await StudentProfile.findOne({ userId: req.user._id });
-        const process = await Process.findOne({ _id: processId, studentId: studentProfile._id }).populate('consultant').populate('initial').populate('invoices');
-        if (!process) {
-            return res.status(404).json({ success: false, message: 'Process not found.' });
-        }
-        res.status(200).json({ success: true, data: process });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to fetch process', error: error.message });
-    }
-});
-
-router.patch('/processes/:processId/cancel', requireStudent, async (req, res) => {
-    try {
-        const { processId } = req.params;
+        const { applicationId } = req.params;
         const { reason } = req.body;
         const studentProfile = await StudentProfile.findOne({ userId: req.user._id });
-        const process = await Process.findOne({ _id: processId, studentId: studentProfile._id });
-        if (!process) {
-            return res.status(404).json({ success: false, message: 'Process not found.' });
+        const application = await Application.findOne({ _id: applicationId, studentId: studentProfile._id });
+        if (!application) {
+            return res.status(404).json({ success: false, message: 'Application not found.' });
         }
-        await process.updateStatus(PROCESS_STATUS.CANCELLED, req.user, reason);
-        res.status(200).json({ success: true, message: 'Process cancelled successfully.' });
+        await application.updateStatus(PROCESS_STATUS.CANCELLED, req.user, reason);
+        res.status(200).json({ success: true, message: 'Application cancelled successfully.' });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }
 });
 
+// Invoice payment endpoint (ownership check uses application reference)
 router.post('/invoices/:invoiceId/pay', requireStudent, async (req, res) => {
     try {
         const { invoiceId } = req.params;
         const studentProfile = await StudentProfile.findOne({ userId: req.user._id });
-        const invoice = await Invoice.findOne({ _id: invoiceId }).populate('processId');
+        const invoice = await Invoice.findOne({ _id: invoiceId }).populate('applicationId');
 
-        if (!invoice || invoice.processId.studentId.toString() !== studentProfile._id.toString()) {
+        if (!invoice || !invoice.applicationId || invoice.applicationId.studentId.toString() !== studentProfile._id.toString()) {
             return res.status(404).json({ success: false, message: 'Invoice not found.' });
         }
 
         await invoice.recordPayment(req.user, req.body);
         res.status(200).json({ success: true, message: 'Payment submitted for review.', data: invoice });
-    } catch (error) {
-        res.status(400).json({ success: false, message: error.message });
-    }
-});
-
-// Get all tasks for a process that are visible to the student
-router.get('/processes/:processId/tasks', requireStudent, async (req, res) => {
-    try {
-        const { processId } = req.params;
-        const tasks = await Task.find({ processId, visibleToStudent: true });
-        res.status(200).json({ success: true, data: tasks });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to fetch tasks', error: error.message });
-    }
-});
-
-// Get all documents for a process
-router.get('/processes/:processId/documents', requireStudent, async (req, res) => {
-    try {
-        const { processId } = req.params;
-        const tasks = await Task.find({ processId, visibleToStudent: true }).select('_id');
-        const taskIds = tasks.map(t => t._id);
-        const documents = await Document.find({ taskId: { $in: taskIds } });
-        res.status(200).json({ success: true, data: documents });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to fetch documents', error: error.message });
-    }
-});
-
-
-// Upload a document for a task
-router.post('/documents/:documentId/upload', requireStudent, async (req, res) => {
-    try {
-        const { documentId } = req.params;
-        const { filePath } = req.body; // Assuming filePath is sent in the body
-        const doc = await Document.findById(documentId);
-
-        // TODO: Add validation to ensure student can only upload to their own documents
-
-        await doc.upload(req.user._id, filePath);
-        res.status(200).json({ success: true, message: 'Document uploaded successfully.', data: doc });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }

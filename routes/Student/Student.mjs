@@ -265,10 +265,25 @@ router.post('/initials', requireStudent, async (req, res) => {
         // Auto-approve logic
         let newStatus = INITIAL_STATUS.PENDING;
         let consultantId = null;
+        // helper to support either ObjectId or 3-letter country code (e.g. 'CAN')
+        async function findCountryByIdOrCode(value) {
+            if (!value) return null;
+            // try ObjectId first
+            if (mongoose.Types.ObjectId.isValid(value)) {
+                try {
+                    const byId = await Country.findById(value);
+                    if (byId) return byId;
+                } catch (e) {
+                    // ignore cast errors and fall through to code lookup
+                }
+            }
+            // fallback to code lookup (Country.code is stored uppercase)
+            return await Country.findOne({ code: String(value).toUpperCase() });
+        }
 
         if (type === INITIAL_TYPE.VISIT) {
             if (preferredCountry && preferredCountry !== 'OTHER') {
-                const country = await Country.findById(preferredCountry);
+                const country = await findCountryByIdOrCode(preferredCountry);
                 if (country && country.consultantId) {
                     const consultant = await StaffProfile.findById(country.consultantId);
                     if (consultant && consultant.isVerified) {
@@ -281,7 +296,7 @@ router.post('/initials', requireStudent, async (req, res) => {
             if (preferredCountry && preferredCountry !== 'OTHER') {
                 newStatus = INITIAL_STATUS.APPROVED;
                 // Find a consultant for the country
-                const country = await Country.findById(preferredCountry);
+                const country = await findCountryByIdOrCode(preferredCountry);
                 if (country && country.consultantId) {
                     const consultant = await StaffProfile.findById(country.consultantId);
                     if (consultant && consultant.isVerified) {

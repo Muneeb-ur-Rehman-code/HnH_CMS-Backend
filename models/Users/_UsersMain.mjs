@@ -212,7 +212,7 @@ const userSchema = new Schema(
                 message: 'Invalid role: {VALUE}'
             },
             default: USER_ROLE.STUDENT,
-            index: true
+            index: true,
         },
 
         source: {

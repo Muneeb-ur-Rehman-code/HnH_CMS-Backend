@@ -21,7 +21,13 @@ const countrySchema = new Schema(
         consultantId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'StaffProfile',
-            required: [true, 'consultantId is required - country must be assigned to a consultant'],
+            required: [true, 'consultantId (Study) is required'],
+            index: true
+        },
+        visitConsultantId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'StaffProfile',
+            required: [true, 'consultantId (Visit Visa) is required'],
             index: true
         },
         deactivatedAt: {

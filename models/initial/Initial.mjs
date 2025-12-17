@@ -60,7 +60,8 @@ const initialSchema = new Schema(
                     return mongoose.Types.ObjectId.isValid(value);
                 },
                 message: 'Preferred country must be a valid Country ID or "OTHER"'
-            }
+            },
+            required: [true, 'Preferred country is required']
         },
 
         otherCountry: {

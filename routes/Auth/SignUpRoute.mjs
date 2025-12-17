@@ -255,6 +255,10 @@ router.post('/resend-email-otp', async (req, res) => {
     }
 });
 
+
+
+
+
 // /api/auth/signup/set-password
 router.post('/set-password', async (req, res) => {
     try {
@@ -427,6 +431,10 @@ router.put('/change-password', attachUser, async (req, res) => {
         });
     }
 });
+
+
+
+
 
 // /api/auth/signup/send-phone-otp
 router.post('/send-phone-otp', async (req, res) => {
@@ -710,67 +718,9 @@ router.delete('/del-phone', attachUser, async (req, res) => {
     }
 });
 
-// /api/auth/signup/status
-router.get('/status', async (req, res) => {
-    try {
-        const { email } = req.query;
 
-        if (!email) {
-            return res.status(400).json({
-                success: false,
-                message: 'Email is required'
-            });
-        }
 
-        const normalizedEmail = email.toLowerCase().trim();
 
-        const user = await User.findOne({ email: normalizedEmail });
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found',
-                data: {
-                    exists: false
-                }
-            });
-        }
-
-        // Use model helper that fetches sensitive fields to compute registration status
-        const reg = await user.getRegistrationStatus();
-
-        // if (reg.hasPassword) {
-        //     return res.status(200).json({
-        //         success: true,
-        //         data: {
-        //             exists: true,
-        //             hasPassword: true,
-        //             message: 'Please login'
-        //         }
-        //     });
-        // }
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                exists: true,
-                hasPassword: reg.hasPassword,
-                emailVerified: reg.isEmailVerified,
-                // phoneVerified: reg.isPhoneVerified,
-                firstName: reg.firstName ? true : false,
-                currentStep: reg.currentStep
-            }
-        });
-
-    } catch (error) {
-        console.error('Get status error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to get status',
-            error: error.message
-        });
-    }
-});
 
 // /api/auth/signup/otp-cooldown
 router.get('/otp-cooldown', async (req, res) => {

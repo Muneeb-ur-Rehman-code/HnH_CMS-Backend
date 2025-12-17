@@ -176,6 +176,7 @@ export const requireStaff = requireRole(USER_ROLE.STAFF);
 export const requireManager = requireRole(STAFF_ROLE.MANAGER, STAFF_ROLE.ADMIN);
 export const requireAdmin = requireRole(STAFF_ROLE.ADMIN);
 export const requireConsultant = requireRole(STAFF_ROLE.CONSULTANT, STAFF_ROLE.ADMIN);
+export const requireVisit = requireRole(STAFF_ROLE.VISIT, STAFF_ROLE.ADMIN);
 export const requireAccountant = requireRole(STAFF_ROLE.ACCOUNTANT, STAFF_ROLE.ADMIN);
 export const requireReceptionist = requireRole(STAFF_ROLE.RECEPTIONIST, STAFF_ROLE.ADMIN);
 export const requireAgent = requireRole(STAFF_ROLE.AGENT, STAFF_ROLE.ADMIN);
@@ -279,8 +280,7 @@ export const requireFullAuth = [
     attachUser,
     requireActiveAccount,
     // requireNotDeleted,
-    requireEmailVerified,
-    requirePasswordSet
+    requireOnboardingComplete
 ];
 
 export const requireVerifiedStaff = [
@@ -300,6 +300,7 @@ export default {
     requireManager,
     requireAdmin,
     requireConsultant,
+    requireVisit,
     requireAccountant,
     requireReceptionist,
     requireAgent,

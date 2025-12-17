@@ -1,7 +1,7 @@
 // routes/onboarding/onboarding.mjs
 import express from 'express';
 import User from '../../models/Users/_UsersMain.mjs';
-import { attachUser, requireAuth, requireEmailVerified, requirePasswordSet, requirePhoneVerified } from '../../middlewares/Auth.mjs';
+import { attachUser, requireAuth, requireEmailVerified, requirePasswordSet, requireBasicInfo } from '../../middlewares/Auth.mjs';
 import StaffProfile from '../../models/Users/StaffProfile.mjs';
 import { USER_ROLE } from '../../models/Users/_UsersMain.mjs';
 import { generateToken } from '../../middlewares/jwt.mjs';
@@ -43,7 +43,7 @@ router.post('/basic-info', attachUser, requireAuth, requireEmailVerified, requir
                 if (isNaN(parsedDob.getTime())) {
                     return res.status(400).json({
                         success: false,
-                        message: 'Invalid dateOfBirth format'
+                        message: 'Invalid dateOfBirth format go for YYYY-MM-DD'
                     });
                 }
                 user.dob = parsedDob;
@@ -99,17 +99,9 @@ router.post('/basic-info', attachUser, requireAuth, requireEmailVerified, requir
 });
 
 // PUT /api/onboarding/basic-info
-router.put('/basic-info', attachUser, requireAuth, requireEmailVerified, requirePasswordSet, async (req, res) => {
+router.put('/basic-info', attachUser, requireAuth, requireEmailVerified, requirePasswordSet, requireBasicInfo, async (req, res) => {
     try {
         const user = req.user;
-        // Ensure that the basic info has been set via POST at least once
-        if (!user.firstName) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please set your basic information first using the POST endpoint.',
-                code: 'BASIC_INFO_NOT_SET'
-            });
-        }
         const { firstName, lastName, dateOfBirth, gender } = req.body || {};
 
         if (firstName) user.firstName = firstName;
@@ -175,31 +167,25 @@ router.get('/status', attachUser, async (req, res) => {
         const status = {
             emailVerified: await user.isEmailVerifiedAsync(),
             passwordSet: await user.hasPasswordAsync(),
-            // phoneNumberSet: !!(user.phone?.number),
-            // phoneVerified: await user.isPhoneVerifiedAsync(),
+            phoneVerified: await user.isPhoneVerifiedAsync(),
             basicInfoSet: !!(user.firstName)
         };
 
         status.onboardingComplete = !!(
             status.emailVerified &&
             status.passwordSet &&
-            // status.phoneVerified &&
             user.firstName
         );
 
-        // Determine current step
         let currentStep = 'complete';
         if (!status.emailVerified) {
             currentStep = 'email-verification';
         } else if (!status.passwordSet) {
             currentStep = 'set-password';
-            // } else if (!status.phoneVerified) {
-            // currentStep = 'phone-verification';
         } else if (!status.basicInfoSet) {
             currentStep = 'basic-info';
         }
 
-        // If user is staff, fetch staff profile and attach staff role + verification
         let staffInfo = null;
         if (user.role === USER_ROLE.STAFF) {
             try {
@@ -243,5 +229,35 @@ router.get('/status', attachUser, async (req, res) => {
         });
     }
 });
+
+
+router.get('/basic-info', attachUser, requireAuth, requireEmailVerified, requirePasswordSet, requireBasicInfo, async (req, res) => {
+    try {
+        const user = req.user;
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                id: user._id,
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                dob: user?.dob || null,
+                gender: user?.gender || null,
+                role: user.role,
+                phoneNumber: user.phone?.number || null
+            }
+        });
+
+    } catch (error) {
+        console.error('Get basic info error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to get basic information',
+            error: error.message
+        });
+    }
+});
+
 
 export default router;

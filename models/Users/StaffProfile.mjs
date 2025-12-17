@@ -6,6 +6,7 @@ const { Schema, model } = mongoose;
 export const STAFF_ROLE = Object.freeze({
     MANAGER: 'MANAGER',
     RECEPTIONIST: 'RECEPTIONIST',
+    VISIT: 'VISIT',
     ACCOUNTANT: 'ACCOUNTANT',
     AGENT: 'AGENT',
     CONSULTANT: 'CONSULTANT',

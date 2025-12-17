@@ -21,10 +21,12 @@ export const USER_SOURCE = Object.freeze({
     CONSULTANT: 'CONSULTANT'
 });
 
+const isDev = process.env.NODE_ENV === 'development';
+
 const OTP_CONFIG = {
-    EXPIRY_MINUTES: 10,
-    MAX_ATTEMPTS: 5,
-    COOLDOWN_MINUTES: 2
+    EXPIRY_MINUTES: isDev ? 1440 : 10,
+    MAX_ATTEMPTS: isDev ? 100 : 5,
+    COOLDOWN_MINUTES: isDev ? 0 : 2
 };
 
 const PASSWORD_CONFIG = {
@@ -194,7 +196,7 @@ const userSchema = new Schema(
             type: String,
             enum: {
                 values: ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'],
-                message: 'Invalid gender: {VALUE}'
+                message: 'Invalid gender: {VALUE} go for MALE, FEMALE, OTHER or PREFER_NOT_TO_SAY'
             },
             default: null
         },

@@ -124,12 +124,15 @@ const getVisitVisaCountry = async () => {
 // Get all staff list
 router.get('/staff', managerAuth, async (req, res) => {
     try {
-        const { roles } = req.query;
-        let query = {};
+        const { roles, verificationStatus } = req.query;
+        let query = {
+            staffRole: { $ne: STAFF_ROLE.ADMIN },
+            userId: { $ne: req.userId }
+        };
 
         if (roles) {
             const roleArray = roles.split(',').map(role => role.trim().toUpperCase());
-            const validRoles = Object.values(STAFF_ROLE);
+            const safeRoles = roleArray.filter(role => role !== STAFF_ROLE.ADMIN && Object.values(STAFF_ROLE).includes(role));
             const invalidRoles = roleArray.filter(role => !validRoles.includes(role));
 
             if (invalidRoles.length > 0) {
@@ -140,7 +143,14 @@ router.get('/staff', managerAuth, async (req, res) => {
                 });
             }
 
-            query.role = { $in: roleArray };
+            query.staffRole = { $in: safeRoles };
+        }
+
+        if (verificationStatus) {
+            const statusUpper = verificationStatus.toUpperCase();
+            if (Object.values(STAFF_VERIFICATION_STATUS).includes(statusUpper)) {
+                query.verificationStatus = statusUpper;
+            }
         }
 
         const staff = await StaffProfile.find(query)
@@ -154,63 +164,28 @@ router.get('/staff', managerAuth, async (req, res) => {
     }
 });
 
-// Get all staff list by verification status
-router.get('/staff/verification-status/:status', managerAuth, async (req, res) => {
-    try {
-        const { status } = req.params;
-
-        if (!Object.values(STAFF_VERIFICATION_STATUS).includes(status)) {
-            const error = new Error('Invalid verification status.');
-            error.status = 400;
-            error.code = 'INVALID_STATUS';
-            throw error;
-        }
-
-        const staff = await StaffProfile.find({ verificationStatus: status })
-            .populate('userId', 'email firstName lastName phoneNumber status')
-            .sort({ createdAt: -1 });
-
-        return sendResponse(res, true, staff);
-    } catch (error) {
-        return sendResponse(res, false, null, error);
-    }
-});
 
 // Verify a staff
 router.put('/staff/:id/verify', managerAuth, async (req, res) => {
     try {
         const { id } = req.params;
 
-        if (!id) {
-            const error = new Error('Staff ID is required.');
-            error.status = 400;
-            error.code = 'ID_REQUIRED';
-            throw error;
-        }
+        if (!mongoose.Types.ObjectId.isValid(id)) throw { status: 400, message: 'Invalid Staff ID format.', code: 'INVALID_ID' };
+
 
         const staff = await StaffProfile.findById(id);
-        if (!staff) {
-            const error = new Error('Staff not found.');
-            error.status = 404;
-            error.code = 'NOT_FOUND';
-            throw error;
-        }
 
-        if (staff.verificationStatus === STAFF_VERIFICATION_STATUS.VERIFIED) {
-            const error = new Error('Staff member is already verified.');
-            error.status = 400;
-            error.code = 'ALREADY_VERIFIED';
-            throw error;
-        }
+        if (!staff) throw { status: 404, message: 'Staff not found.', code: 'NOT_FOUND' };
+        if (staff.userId.toString() === req.userId.toString()) throw { status: 403, message: 'You cannot verify yourself.', code: 'SELF_ACTION_FORBIDDEN' };
+        if (staff.verificationStatus === STAFF_VERIFICATION_STATUS.VERIFIED) throw { status: 400, message: 'Already verified.', code: 'ALREADY_VERIFIED' };
 
         staff.verificationStatus = STAFF_VERIFICATION_STATUS.VERIFIED;
         staff.rejectionReason = null;
         await staff.save();
 
-        const populatedStaff = await StaffProfile.findById(id)
-            .populate('userId', 'email firstName lastName phoneNumber status');
+        const result = await StaffProfile.findById(id).populate('userId', 'email firstName lastName phoneNumber status');
 
-        return sendResponse(res, true, populatedStaff);
+        return sendResponse(res, true, result);
     } catch (error) {
         return sendResponse(res, false, null, error);
     }
@@ -220,31 +195,23 @@ router.put('/staff/:id/verify', managerAuth, async (req, res) => {
 router.put('/staff/:id/reject', managerAuth, async (req, res) => {
     try {
         const { id } = req.params;
-        const { reason } = req.body;
+        const { reason } = req.body || {};
 
-        if (!id) {
-            const error = new Error('Staff ID is required.');
-            error.status = 400;
-            error.code = 'ID_REQUIRED';
-            throw error;
-        }
+        if (!mongoose.Types.ObjectId.isValid(id)) throw { status: 400, message: 'Invalid Staff ID format.', code: 'INVALID_ID' };
 
         const staff = await StaffProfile.findById(id);
-        if (!staff) {
-            const error = new Error('Staff not found.');
-            error.status = 404;
-            error.code = 'NOT_FOUND';
-            throw error;
-        }
+
+        if (!staff) throw { status: 404, message: 'Staff profile not found.', code: 'NOT_FOUND' };
+        if (staff.userId.toString() === req.userId.toString()) throw { status: 403, message: 'You cannot reject your own profile.', code: 'SELF_ACTION_FORBIDDEN' };
+        if (staff.staffRole === STAFF_ROLE.ADMIN) throw { status: 403, message: 'Managers cannot reject Admin staff.', code: 'ACCESS_DENIED' };
 
         staff.verificationStatus = STAFF_VERIFICATION_STATUS.REJECTED;
-        staff.rejectionReason = reason ? reason.trim() : null;
+        staff.rejectionReason = reason?.trim() || 'No reason provided by manager.';
         await staff.save();
 
-        const populatedStaff = await StaffProfile.findById(id)
-            .populate('userId', 'email firstName lastName phoneNumber status');
-
+        const populatedStaff = await StaffProfile.findById(id).populate('userId', 'email firstName lastName phoneNumber status');
         return sendResponse(res, true, populatedStaff);
+
     } catch (error) {
         return sendResponse(res, false, null, error);
     }
@@ -254,48 +221,31 @@ router.put('/staff/:id/reject', managerAuth, async (req, res) => {
 router.put('/staff/:id/role', managerAuth, async (req, res) => {
     try {
         const { id } = req.params;
-        const { staffRole } = req.body;
+        const { staffRole } = req.body || {};
 
-        if (!id) {
-            const error = new Error('Staff ID is required.');
-            error.status = 400;
-            error.code = 'ID_REQUIRED';
-            throw error;
-        }
 
-        if (!staffRole) {
-            const error = new Error('Staff role is required.');
-            error.status = 400;
-            error.code = 'ROLE_REQUIRED';
-            throw error;
-        }
+        if (!mongoose.Types.ObjectId.isValid(id)) throw { status: 400, message: 'Invalid Staff ID format.', code: 'INVALID_ID' };
 
-        if (!Object.values(STAFF_ROLE).includes(staffRole)) {
-            const error = new Error('Invalid staff role.');
-            error.status = 400;
-            error.code = 'INVALID_ROLE';
-            throw error;
-        }
+        if (!staffRole) throw { status: 400, message: 'New role is required.', code: 'ROLE_REQUIRED' };
+        if (staffRole === STAFF_ROLE.ADMIN) throw { status: 403, message: 'Managers cannot promote users to Admin.', code: 'PRIVILEGE_ESCALATION_DENIED' };
+
+        if (!Object.values(STAFF_ROLE).includes(staffRole)) throw { status: 400, message: 'Invalid staff role.', code: 'INVALID_ROLE' };
 
         const staff = await StaffProfile.findById(id);
-        if (!staff) {
-            const error = new Error('Staff not found.');
-            error.status = 404;
-            error.code = 'NOT_FOUND';
-            throw error;
-        }
+        if (!staff) throw { status: 404, message: 'Staff not found.', code: 'NOT_FOUND' };
 
         staff.staffRole = staffRole;
         await staff.save();
 
-        const populatedStaff = await StaffProfile.findById(id)
-            .populate('userId', 'email firstName lastName phoneNumber status');
+        const result = await StaffProfile.findById(id).populate('userId', 'email firstName lastName phoneNumber status');
+        return sendResponse(res, true, result);
 
-        return sendResponse(res, true, populatedStaff);
     } catch (error) {
         return sendResponse(res, false, null, error);
     }
 });
+
+
 
 // ============================================
 // INITIAL MANAGEMENT

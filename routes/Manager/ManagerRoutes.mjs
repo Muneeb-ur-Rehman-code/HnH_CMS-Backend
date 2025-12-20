@@ -342,102 +342,6 @@ router.post('/initials', async (req, res) => {
     }
 });
 
-router.patch('/initials/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const currentType = req.rtype;
-
-        // 1. Destructure and block restricted fields
-        const {
-            type: newType,
-            preferredCountry,
-            otherCountry,
-            preferredUniversity,
-            otherUniversity,
-            notes
-        } = req.body;
-
-        if (req.body.status || req.body.assignedConsultantId) {
-            throw { status: 400, message: 'Restricted fields detected.', code: 'RESTRICTED_FIELDS' };
-        }
-
-        const initial = await Initial.findOne({ _id: id, type: currentType });
-        if (!initial) throw { status: 404, message: 'Record not found.', code: 'NOT_FOUND' };
-
-        // 2. Verify Country (if provided)
-        if (preferredCountry) {
-            if (preferredCountry === 'OTHER') {
-                initial.preferredCountry = 'OTHER';
-                initial.otherCountry = otherCountry?.trim() || 'Not Specified';
-            } else {
-                if (!mongoose.Types.ObjectId.isValid(preferredCountry)) {
-                    throw { status: 400, message: 'Invalid Country ID format.', code: 'INVALID_ID' };
-                }
-                const country = await Country.findOne({ _id: preferredCountry, deactivatedAt: null });
-                if (!country) throw { status: 404, message: 'Country not found or inactive.', code: 'COUNTRY_NOT_FOUND' };
-
-                initial.preferredCountry = country._id;
-                initial.otherCountry = null;
-            }
-        }
-
-        // 3. Handle Type Transition
-        const typeChanging = newType && newType !== initial.type;
-        if (typeChanging) {
-            if (newType !== INITIAL_TYPE.STUDY && newType !== INITIAL_TYPE.VISIT) {
-                throw { status: 400, message: 'Invalid target type.', code: 'INVALID_TYPE' };
-            }
-            initial.type = newType;
-            initial.assignedConsultantId = null; // Always reset consultant on type change
-        }
-
-        // 4. Verify University Logic
-        // This runs if we are in STUDY mode (either originally or just switched to it)
-        if (initial.type === INITIAL_TYPE.STUDY) {
-
-            // Logic for Visit -> Study transition without Uni info provided
-            if (typeChanging && !preferredUniversity) {
-                initial.preferredUniversity = 'OTHER';
-                initial.otherUniversity = 'Not Specified';
-            }
-
-            // Logic if a University update is actually provided
-            else if (preferredUniversity) {
-                if (preferredUniversity === 'OTHER') {
-                    initial.preferredUniversity = 'OTHER';
-                    initial.otherUniversity = otherUniversity?.trim() || 'Not Specified';
-                } else {
-                    if (!mongoose.Types.ObjectId.isValid(preferredUniversity)) {
-                        throw { status: 400, message: 'Invalid University ID format.', code: 'INVALID_ID' };
-                    }
-                    const uni = await University.findOne({ _id: preferredUniversity, deactivatedAt: null });
-                    if (!uni) throw { status: 404, message: 'University not found.', code: 'UNIVERSITY_NOT_FOUND' };
-
-                    // Cross-check: Does this university belong to the selected country?
-                    if (initial.preferredCountry !== 'OTHER' && uni.country.toString() !== initial.preferredCountry.toString()) {
-                        throw { status: 400, message: 'University does not belong to the selected country.', code: 'MISMATCH' };
-                    }
-
-                    initial.preferredUniversity = uni._id;
-                    initial.otherUniversity = null;
-                }
-            }
-        } else {
-            // If type is VISIT (or switched to it), clear university fields
-            initial.preferredUniversity = null;
-            initial.otherUniversity = null;
-        }
-
-        if (notes !== undefined) initial.notes = notes.trim();
-
-        await initial.save();
-        return sendResponse(res, true, initial);
-
-    } catch (error) {
-        return sendResponse(res, false, null, error);
-    }
-});
-
 router.post('/initials/import', async (req, res) => {
     try {
         const type = req.rtype;
@@ -647,5 +551,102 @@ router.patch('/initials/bulk-assign', async (req, res) => {
         return sendResponse(res, false, null, error);
     }
 });
+
+router.patch('/initials/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const currentType = req.rtype;
+
+        // 1. Destructure and block restricted fields
+        const {
+            type: newType,
+            preferredCountry,
+            otherCountry,
+            preferredUniversity,
+            otherUniversity,
+            notes
+        } = req.body;
+
+        if (req.body.status || req.body.assignedConsultantId) {
+            throw { status: 400, message: 'Restricted fields detected.', code: 'RESTRICTED_FIELDS' };
+        }
+
+        const initial = await Initial.findOne({ _id: id, type: currentType });
+        if (!initial) throw { status: 404, message: 'Record not found.', code: 'NOT_FOUND' };
+
+        // 2. Verify Country (if provided)
+        if (preferredCountry) {
+            if (preferredCountry === 'OTHER') {
+                initial.preferredCountry = 'OTHER';
+                initial.otherCountry = otherCountry?.trim() || 'Not Specified';
+            } else {
+                if (!mongoose.Types.ObjectId.isValid(preferredCountry)) {
+                    throw { status: 400, message: 'Invalid Country ID format.', code: 'INVALID_ID' };
+                }
+                const country = await Country.findOne({ _id: preferredCountry, deactivatedAt: null });
+                if (!country) throw { status: 404, message: 'Country not found or inactive.', code: 'COUNTRY_NOT_FOUND' };
+
+                initial.preferredCountry = country._id;
+                initial.otherCountry = null;
+            }
+        }
+
+        // 3. Handle Type Transition
+        const typeChanging = newType && newType !== initial.type;
+        if (typeChanging) {
+            if (newType !== INITIAL_TYPE.STUDY && newType !== INITIAL_TYPE.VISIT) {
+                throw { status: 400, message: 'Invalid target type.', code: 'INVALID_TYPE' };
+            }
+            initial.type = newType;
+            initial.assignedConsultantId = null; // Always reset consultant on type change
+        }
+
+        // 4. Verify University Logic
+        // This runs if we are in STUDY mode (either originally or just switched to it)
+        if (initial.type === INITIAL_TYPE.STUDY) {
+
+            // Logic for Visit -> Study transition without Uni info provided
+            if (typeChanging && !preferredUniversity) {
+                initial.preferredUniversity = 'OTHER';
+                initial.otherUniversity = 'Not Specified';
+            }
+
+            // Logic if a University update is actually provided
+            else if (preferredUniversity) {
+                if (preferredUniversity === 'OTHER') {
+                    initial.preferredUniversity = 'OTHER';
+                    initial.otherUniversity = otherUniversity?.trim() || 'Not Specified';
+                } else {
+                    if (!mongoose.Types.ObjectId.isValid(preferredUniversity)) {
+                        throw { status: 400, message: 'Invalid University ID format.', code: 'INVALID_ID' };
+                    }
+                    const uni = await University.findOne({ _id: preferredUniversity, deactivatedAt: null });
+                    if (!uni) throw { status: 404, message: 'University not found.', code: 'UNIVERSITY_NOT_FOUND' };
+
+                    // Cross-check: Does this university belong to the selected country?
+                    if (initial.preferredCountry !== 'OTHER' && uni.country.toString() !== initial.preferredCountry.toString()) {
+                        throw { status: 400, message: 'University does not belong to the selected country.', code: 'MISMATCH' };
+                    }
+
+                    initial.preferredUniversity = uni._id;
+                    initial.otherUniversity = null;
+                }
+            }
+        } else {
+            // If type is VISIT (or switched to it), clear university fields
+            initial.preferredUniversity = null;
+            initial.otherUniversity = null;
+        }
+
+        if (notes !== undefined) initial.notes = notes.trim();
+
+        await initial.save();
+        return sendResponse(res, true, initial);
+
+    } catch (error) {
+        return sendResponse(res, false, null, error);
+    }
+});
+
 
 export default router;

@@ -124,6 +124,7 @@ router.get('/staff', async (req, res) => {
         if (roles) {
             const roleArray = roles.split(',').map(role => role.trim().toUpperCase());
             const safeRoles = roleArray.filter(role => role !== STAFF_ROLE.ADMIN && Object.values(STAFF_ROLE).includes(role));
+            const validRoles = Object.values(STAFF_ROLE);
             const invalidRoles = roleArray.filter(role => !validRoles.includes(role));
 
             if (invalidRoles.length > 0) {

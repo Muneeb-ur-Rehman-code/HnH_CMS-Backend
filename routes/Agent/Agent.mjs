@@ -2,7 +2,8 @@
 import express from 'express';
 import { attachUser, requireRole } from '../../middlewares/Auth.mjs';
 import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
-import Process, { PROCESS_STATUS } from '../../models/Process/Process.mjs';
+import Process from '../../models/Process/Process.mjs';
+import { PROCESS_STATUS } from '../../config/enums.mjs';
 import Task from '../../models/Task/Tasks.mjs';
 import Document from '../../models/Docx/Document.mjs';
 

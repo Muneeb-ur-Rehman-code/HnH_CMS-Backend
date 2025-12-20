@@ -99,7 +99,7 @@ router.post('/initial', async (req, res) => {
         let universityId = null;
         let otherUniversityText = null;
         let assignedConsultantId = null;
-        let status = INITIAL_STATUS.PENDING;
+        let status = INITIAL_STATUS.APPROVED;
         let reviewedBy = null;
         let reviewedAt = null;
 

@@ -28,7 +28,8 @@ import StaffProfile, { STAFF_ROLE, STAFF_VERIFICATION_STATUS } from '../models/U
 import Country from '../models/Country/CountryModel.mjs';
 import University from '../models/University/UniModel.mjs';
 import Initial, { INITIAL_STATUS, INITIAL_TYPE, INITIAL_SOURCE } from '../models/initial/Initial.mjs';
-import Process, { PROCESS_STATUS, INTAKE_PREFERENCE, CURRENCY } from '../models/Process/Process.mjs';
+import Process from '../models/Process/Process.mjs';
+import { PROCESS_STATUS, INTAKE_PREFERENCE, CURRENCY } from '../config/enums.mjs';
 import Task, { TASK_STATUS } from '../models/Task/Tasks.mjs';
 import Invoice, { INVOICE_STATUS, INVOICE_PAYMENT_TYPE, PAYMENT_METHOD } from '../models/Invoice/Invoice.mjs';
 import Document, { DOCUMENT_TYPE, DOCUMENT_STATUS } from '../models/Docx/Document.mjs';
@@ -55,72 +56,72 @@ const PASSWORD_SALT_ROUNDS = 12;
 
 // Sample country data
 const COUNTRIES_DATA = [
-    { name: 'United Kingdom', code: 'GBR' },
-    { name: 'United States', code: 'USA' },
-    { name: 'Canada', code: 'CAN' },
-    { name: 'Australia', code: 'AUS' },
-    { name: 'New Zealand', code: 'NZL' },
-    { name: 'Germany', code: 'DEU' },
-    { name: 'Netherlands', code: 'NLD' },
-    { name: 'Pakistan', code: 'PKR', isVisiting: true }
+    { code: 'GBR' },
+    { code: 'USA' },
+    { code: 'CAN' },
+    { code: 'AUS' },
+    { code: 'NZL' },
+    { code: 'DEU' },
+    { code: 'NLD' },
+    { code: 'PAK' }
 ];
 
 const UNIVERSITIES_DATA = {
     GBR: [
-        { name: 'University of Oxford', shortName: 'OXFD', state: 'England', city: 'Oxford' },
-        { name: 'University of Cambridge', shortName: 'CAMB', state: 'England', city: 'Cambridge' },
-        { name: 'Imperial College London', shortName: 'ICLN', state: 'England', city: 'London' },
-        { name: 'London School of Economics', shortName: 'LSEC', state: 'England', city: 'London' },
-        { name: 'University of Manchester', shortName: 'MANC', state: 'England', city: 'Manchester' }
+        { name: 'University of Oxford', shortName: 'OXFD', state: 'England', city: 'Oxford', imagePath: '/uploads/sample/university.webp' },
+        { name: 'University of Cambridge', shortName: 'CAMB', state: 'England', city: 'Cambridge', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Imperial College London', shortName: 'ICLN', state: 'England', city: 'London', imagePath: '/uploads/sample/university.webp' },
+        { name: 'London School of Economics', shortName: 'LSEC', state: 'England', city: 'London', imagePath: '/uploads/sample/university.webp' },
+        { name: 'University of Manchester', shortName: 'MANC', state: 'England', city: 'Manchester', imagePath: '/uploads/sample/university.webp' }
     ],
     USA: [
-        { name: 'Harvard University', shortName: 'HARV', state: 'Massachusetts', city: 'Cambridge' },
-        { name: 'Stanford University', shortName: 'STAN', state: 'California', city: 'Stanford' },
-        { name: 'Massachusetts Institute of Technology', shortName: 'MITM', state: 'Massachusetts', city: 'Cambridge' },
-        { name: 'Yale University', shortName: 'YALE', state: 'Connecticut', city: 'New Haven' },
-        { name: 'Princeton University', shortName: 'PRIN', state: 'New Jersey', city: 'Princeton' }
+        { name: 'Harvard University', shortName: 'HARV', state: 'Massachusetts', city: 'Cambridge', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Stanford University', shortName: 'STAN', state: 'California', city: 'Stanford', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Massachusetts Institute of Technology', shortName: 'MITM', state: 'Massachusetts', city: 'Cambridge', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Yale University', shortName: 'YALE', state: 'Connecticut', city: 'New Haven', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Princeton University', shortName: 'PRIN', state: 'New Jersey', city: 'Princeton', imagePath: '/uploads/sample/university.webp' }
     ],
     CAN: [
-        { name: 'University of Toronto', shortName: 'UONT', state: 'Ontario', city: 'Toronto' },
-        { name: 'McGill University', shortName: 'MCGL', state: 'Quebec', city: 'Montreal' },
-        { name: 'University of British Columbia', shortName: 'UBCV', state: 'British Columbia', city: 'Vancouver' },
-        { name: 'McMaster University', shortName: 'MCMC', state: 'Ontario', city: 'Hamilton' },
-        { name: 'University of Alberta', shortName: 'UALB', state: 'Alberta', city: 'Edmonton' }
+        { name: 'University of Toronto', shortName: 'UONT', state: 'Ontario', city: 'Toronto', imagePath: '/uploads/sample/university.webp' },
+        { name: 'McGill University', shortName: 'MCGL', state: 'Quebec', city: 'Montreal', imagePath: '/uploads/sample/university.webp' },
+        { name: 'University of British Columbia', shortName: 'UBCV', state: 'British Columbia', city: 'Vancouver', imagePath: '/uploads/sample/university.webp' },
+        { name: 'McMaster University', shortName: 'MCMC', state: 'Ontario', city: 'Hamilton', imagePath: '/uploads/sample/university.webp' },
+        { name: 'University of Alberta', shortName: 'UALB', state: 'Alberta', city: 'Edmonton', imagePath: '/uploads/sample/university.webp' }
     ],
     AUS: [
-        { name: 'University of Melbourne', shortName: 'UNMD', state: 'Victoria', city: 'Melbourne' },
-        { name: 'University of Sydney', shortName: 'UNSY', state: 'New South Wales', city: 'Sydney' },
-        { name: 'Australian National University', shortName: 'ANUS', state: 'Australian Capital Territory', city: 'Canberra' },
-        { name: 'UNSW Sydney', shortName: 'UNSW', state: 'New South Wales', city: 'Sydney' },
-        { name: 'Monash University', shortName: 'MNSH', state: 'Victoria', city: 'Clayton' }
+        { name: 'University of Melbourne', shortName: 'UNMD', state: 'Victoria', city: 'Melbourne', imagePath: '/uploads/sample/university.webp' },
+        { name: 'University of Sydney', shortName: 'UNSY', state: 'New South Wales', city: 'Sydney', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Australian National University', shortName: 'ANUS', state: 'Australian Capital Territory', city: 'Canberra', imagePath: '/uploads/sample/university.webp' },
+        { name: 'UNSW Sydney', shortName: 'UNSW', state: 'New South Wales', city: 'Sydney', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Monash University', shortName: 'MNSH', state: 'Victoria', city: 'Clayton', imagePath: '/uploads/sample/university.webp' }
     ],
     NZL: [
-        { name: 'University of Auckland', shortName: 'UAAK', state: 'Auckland', city: 'Auckland' },
-        { name: 'University of Otago', shortName: 'UOTA', state: 'Otago', city: 'Dunedin' },
-        { name: 'Victoria University of Wellington', shortName: 'VUWL', state: 'Wellington', city: 'Wellington' },
-        { name: 'Massey University', shortName: 'MSSU', state: 'Manawatu', city: 'Palmerston North' },
-        { name: 'University of Canterbury', shortName: 'UCTR', state: 'Canterbury', city: 'Christchurch' }
+        { name: 'University of Auckland', shortName: 'UAAK', state: 'Auckland', city: 'Auckland', imagePath: '/uploads/sample/university.webp' },
+        { name: 'University of Otago', shortName: 'UOTA', state: 'Otago', city: 'Dunedin', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Victoria University of Wellington', shortName: 'VUWL', state: 'Wellington', city: 'Wellington', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Massey University', shortName: 'MSSU', state: 'Manawatu', city: 'Palmerston North', imagePath: '/uploads/sample/university.webp' },
+        { name: 'University of Canterbury', shortName: 'UCTR', state: 'Canterbury', city: 'Christchurch', imagePath: '/uploads/sample/university.webp' }
     ],
     DEU: [
-        { name: 'University of Berlin', shortName: 'UBLN', state: 'Berlin', city: 'Berlin' },
-        { name: 'Heidelberg University', shortName: 'UHDG', state: 'Baden-Wurttemberg', city: 'Heidelberg' },
-        { name: 'Technical University of Munich', shortName: 'TUMM', state: 'Bavaria', city: 'Munich' },
-        { name: 'University of Hamburg', shortName: 'UHMB', state: 'Hamburg', city: 'Hamburg' },
-        { name: 'University of Cologne', shortName: 'UCLN', state: 'North Rhine-Westphalia', city: 'Cologne' }
+        { name: 'University of Berlin', shortName: 'UBLN', state: 'Berlin', city: 'Berlin', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Heidelberg University', shortName: 'UHDG', state: 'Baden-Wurttemberg', city: 'Heidelberg', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Technical University of Munich', shortName: 'TUMM', state: 'Bavaria', city: 'Munich', imagePath: '/uploads/sample/university.webp' },
+        { name: 'University of Hamburg', shortName: 'UHMB', state: 'Hamburg', city: 'Hamburg', imagePath: '/uploads/sample/university.webp' },
+        { name: 'University of Cologne', shortName: 'UCLN', state: 'North Rhine-Westphalia', city: 'Cologne', imagePath: '/uploads/sample/university.webp' }
     ],
     NLD: [
-        { name: 'University of Amsterdam', shortName: 'UAMM', state: 'North Holland', city: 'Amsterdam' },
-        { name: 'Utrecht University', shortName: 'UUTR', state: 'Utrecht', city: 'Utrecht' },
-        { name: 'Erasmus University Rotterdam', shortName: 'EROТ', state: 'South Holland', city: 'Rotterdam' },
-        { name: 'University of Groningen', shortName: 'UGRN', state: 'Groningen', city: 'Groningen' },
-        { name: 'Leiden University', shortName: 'ULDN', state: 'South Holland', city: 'Leiden' }
+        { name: 'University of Amsterdam', shortName: 'UAMM', state: 'North Holland', city: 'Amsterdam', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Utrecht University', shortName: 'UUTR', state: 'Utrecht', city: 'Utrecht', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Erasmus University Rotterdam', shortName: 'EROТ', state: 'South Holland', city: 'Rotterdam', imagePath: '/uploads/sample/university.webp' },
+        { name: 'University of Groningen', shortName: 'UGRN', state: 'Groningen', city: 'Groningen', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Leiden University', shortName: 'ULDN', state: 'South Holland', city: 'Leiden', imagePath: '/uploads/sample/university.webp' }
     ],
     PKR: [
-        { name: 'FAST NUCES', shortName: 'FASTL', state: 'Punjab', city: 'Lahore' },
-        { name: 'Lahore University of Management Sciences', shortName: 'LUML', state: 'Punjab', city: 'Lahore' },
-        { name: 'Karachi University', shortName: 'UKRK', state: 'Sindh', city: 'Karachi' },
-        { name: 'COMSATS University Islamabad', shortName: 'COMC', state: 'Islamabad Capital Territory', city: 'Islamabad' },
-        { name: 'Pakistan Institute of Engineering and Applied Sciences', shortName: 'PIAS', state: 'Islamabad Capital Territory', city: 'Islamabad' }
+        { name: 'FAST NUCES', shortName: 'FASTL', state: 'Punjab', city: 'Lahore', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Lahore University of Management Sciences', shortName: 'LUML', state: 'Punjab', city: 'Lahore', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Karachi University', shortName: 'UKRK', state: 'Sindh', city: 'Karachi', imagePath: '/uploads/sample/university.webp' },
+        { name: 'COMSATS University Islamabad', shortName: 'COMC', state: 'Islamabad Capital Territory', city: 'Islamabad', imagePath: '/uploads/sample/university.webp' },
+        { name: 'Pakistan Institute of Engineering and Applied Sciences', shortName: 'PIAS', state: 'Islamabad Capital Territory', city: 'Islamabad', imagePath: '/uploads/sample/university.webp' }
     ]
 };
 
@@ -194,10 +195,10 @@ const createUsers = async () => {
     const users = [];
 
     // Create admin
-    const adminHash = await hashPassword(TEST_PASSWORD);
+    const hashpswd = await hashPassword(TEST_PASSWORD);
     const admin = await User.create({
         email: 'admin@hnh.com',
-        password: adminHash,
+        password: hashpswd,
         firstName: 'Admin',
         lastName: 'User',
         role: 'STAFF',
@@ -214,10 +215,9 @@ const createUsers = async () => {
 
     // Create managers
     for (let i = 1; i <= 2; i++) {
-        const managerHash = await hashPassword(TEST_PASSWORD);
         const manager = await User.create({
             email: `manager${i}@hnh.com`,
-            password: managerHash,
+            password: hashpswd,
             firstName: `Manager`,
             lastName: String.fromCharCode(64 + i) + "Man",
             role: 'STAFF',
@@ -234,7 +234,7 @@ const createUsers = async () => {
     }
 
     // Create consultants
-    for (let i = 1; i <= 7; i++) {
+    for (let i = 1; i <= 20; i++) {
         const consultantHash = await hashPassword(TEST_PASSWORD);
         const consultant = await User.create({
             email: `consultant${i}@hnh.com`,
@@ -258,14 +258,14 @@ const createUsers = async () => {
     const staffRoles = ['ACCOUNTANT', 'RECEPTIONIST', 'AGENT'];
     let staffCounter = 0;
     for (const role of staffRoles) {
-        for (let i = 1; i <= 2; i++) {
+        for (let i = 1; i <= 5; i++) {
             staffCounter++;
             const staffHash = await hashPassword(TEST_PASSWORD);
             const staff = await User.create({
                 email: `${role.toLowerCase()}${i}@hnh.com`,
                 password: staffHash,
                 firstName: role.charAt(0) + role.slice(1).toLowerCase(),
-                lastName: String.fromCharCode(84 + staffCounter) + "Stf",
+                lastName: String.fromCharCode(65 + staffCounter) + "Stf",
                 role: 'STAFF',
                 status: 'ACTIVE',
                 source: 'ONLINE',
@@ -283,8 +283,8 @@ const createUsers = async () => {
 
     // Create students (some with password, some without)
     for (let i = 1; i <= 20; i++) {
-        const hasPassword = i > 2;
-        const uniqueLetter = String.fromCharCode(64 + ((i - 1) % 26 + 1));
+        const hasPassword = i < 19;
+        const uniqueLetter = String.fromCharCode(65 + (i % 26));
         const studentData = {
             email: `student${i}@hnh.com`,
             firstName: 'Student',
@@ -334,7 +334,7 @@ const createStaffProfiles = async (users) => {
 
         const profile = await StaffProfile.create({
             userId: user._id,
-            staffRole: role, // <-- CORRECTED: Directly use the attached role
+            staffRole: role,
             verificationStatus: 'VERIFIED'
         });
         staffProfiles.push(profile);
@@ -347,49 +347,69 @@ const createStaffProfiles = async (users) => {
  * Create countries with consultants
  */
 const createCountries = async (staffProfiles) => {
-    console.log(`\n${CYAN}${A} Creating countries...${RESET}`);
+    console.log(`\n${CYAN}${A} Ensuring countries exist and assigning consultants...${RESET}`);
     const countries = [];
     const consultants = staffProfiles.filter(sp => sp.staffRole === 'CONSULTANT');
 
     for (let i = 0; i < COUNTRIES_DATA.length; i++) {
         const countryData = COUNTRIES_DATA[i];
-        const consultant = consultants[i % consultants.length];
+        let country = await Country.findOne({ code: countryData.code });
+        if (!country) {
+            // minimal fallback if countrypull hasn't run
+            country = await Country.create({ name: countryData.code, code: countryData.code });
+        }
 
-        const country = await Country.create({
-            name: countryData.name,
-            code: countryData.code,
-            consultantId: consultant.userId
-        });
+        // assign consultants to country if not set
+        if (!country.consultantId || !country.visitConsultantId) {
+            const consultant = consultants[(i * 2) % Math.max(1, consultants.length)];
+            const visitConsultant = consultants[(i * 2 + 1) % Math.max(1, consultants.length)];
+            country.consultantId = consultant ? consultant.userId : country.consultantId;
+            country.visitConsultantId = visitConsultant ? visitConsultant.userId : country.visitConsultantId;
+            await country.save();
+        }
+
         countries.push(country);
     }
 
-    console.log(T + `${GREEN}Created ${countries.length} countries${RESET}`);
+    console.log(T + `${GREEN}Prepared ${countries.length} countries${RESET}`);
     return countries;
 };
 
 /**
- * Create universities
+ * Activate existing universities by country code (countrypull should have created them).
+ * Also assign some random consultants to countries and ensure a few unis are activated.
  */
-const createUniversities = async (countries) => {
-    console.log(`\n${CYAN}${A} Creating universities...${RESET}`);
-    const universities = [];
+const activateUniversities = async (countries, staffProfiles) => {
+    console.log(`\n${CYAN}${A} Activating existing universities and assigning consultants...${RESET}`);
+    const activated = [];
+    const consultants = staffProfiles.filter(sp => sp.staffRole === 'CONSULTANT');
 
     for (const country of countries) {
-        const unis = UNIVERSITIES_DATA[country.code] || [];
-        for (const uniData of unis) {
-            const university = await University.create({
-                name: uniData.name,
-                shortName: uniData.shortName,
-                country: country._id,
-                state: uniData.state,
-                city: uniData.city
-            });
-            universities.push(university);
+        const unis = await University.find({ country: country._id }).limit(100).lean();
+        if (!unis || unis.length === 0) continue;
+
+        // Activate most universities for this country
+        for (const u of unis) {
+            await University.updateOne({ _id: u._id }, { $set: { deactivatedAt: null } });
+            activated.push(u._id);
+        }
+
+        // Assign consultants to country (if not already assigned)
+        if (!country.consultantId || !country.visitConsultantId) {
+            const c1 = consultants[Math.floor(Math.random() * Math.max(1, consultants.length))];
+            const c2 = consultants[Math.floor(Math.random() * Math.max(1, consultants.length))];
+            country.consultantId = c1 ? c1.userId : country.consultantId;
+            country.visitConsultantId = c2 ? c2.userId : country.visitConsultantId;
+            await country.save();
         }
     }
 
-    console.log(T + `${GREEN}Created ${universities.length} universities${RESET}`);
-    return universities;
+    // Ensure at least one extra university (global) is activated for variety
+    const one = await University.findOne();
+    if (one) await University.updateOne({ _id: one._id }, { $set: { deactivatedAt: null } });
+
+    console.log(T + `${GREEN}Activated ${activated.length} universities${RESET}`);
+    return activated;
 };
 
 /**
@@ -401,9 +421,15 @@ const createStudentProfiles = async (users) => {
     const studentUsers = users.filter(u => u.role === 'STUDENT');
 
     for (let i = 0; i < studentUsers.length; i++) {
+        const user = studentUsers[i];
+        // pick a country by code and fetch its name if available
+        const code = COUNTRIES_DATA[i % COUNTRIES_DATA.length].code;
+        const countryDoc = await Country.findOne({ code });
+        const nationality = countryDoc ? countryDoc.name : code;
+
         const student = await StudentProfile.create({
-            userId: studentUsers[i]._id,
-            nationality: COUNTRIES_DATA[i % COUNTRIES_DATA.length].name,
+            userId: user._id,
+            nationality,
             passportNumber: `PSP${String(i + 1).padStart(6, '0')}`,
             passportExpiry: new Date(new Date().getFullYear() + 5, 0, 1),
             address: {
@@ -411,7 +437,7 @@ const createStudentProfiles = async (users) => {
                 city: `City${i + 1}`,
                 state: `State${i + 1}`,
                 postalCode: `12345`,
-                country: COUNTRIES_DATA[i % COUNTRIES_DATA.length].name
+                country: nationality
             },
             educationLevel: 'BACHELORS',
             currentInstitution: `University ${i + 1}`,
@@ -431,236 +457,153 @@ const createStudentProfiles = async (users) => {
     return studentProfiles;
 };
 
+
 /**
- * Create initials (enough to cover various states)
+ * Create initials with distributed statuses and ensure declined/rejected ones have review metadata.
  */
 const createInitials = async (studentProfiles, countries, staffProfiles) => {
     console.log(`\n${CYAN}${A} Creating initials...${RESET}`);
     const initials = [];
     const consultants = staffProfiles.filter(sp => sp.staffRole === 'CONSULTANT');
-    let consultantIndex = 0;
 
-    for (let i = 0; i < studentProfiles.length; i++) {
-        const student = studentProfiles[i];
-        const country = countries[i % countries.length];
-        const consultant = consultants[consultantIndex % consultants.length];
-        consultantIndex++;
+    const statusWeights = [
+        { s: INITIAL_STATUS.DONE, w: 60 },
+        { s: INITIAL_STATUS.PENDING, w: 10 },
+        { s: INITIAL_STATUS.APPROVED, w: 10 },
+        { s: INITIAL_STATUS.DECLINED, w: 5 },
+        { s: INITIAL_STATUS.REJECTED, w: 5 },
+        { s: INITIAL_STATUS.REFUSED, w: 10 }
+    ];
 
-        // Create initial
-        const initial = await Initial.create({
-            studentId: student._id,
-            type: i % 3 === 0 ? 'VISIT' : 'STUDY',
-            preferredCountry: country._id,
-            assignedConsultantId: consultant._id,
-            notes: `Initial consultation for Student ${i + 1}`,
-            source: i % 2 === 0 ? 'ONLINE' : 'WALK_IN',
-            status: INITIAL_STATUS.APPROVED,
-            reviewedBy: consultants[0].userId,
-            reviewedAt: new Date()
-        });
-        initials.push(initial);
+    const pickStatus = () => {
+        const total = statusWeights.reduce((a, b) => a + b.w, 0);
+        let r = Math.random() * total;
+        for (const item of statusWeights) {
+            if (r < item.w) return item.s;
+            r -= item.w;
+        }
+        return INITIAL_STATUS.DONE;
+    };
+
+    for (const student of studentProfiles) {
+        // each student gets 1-3 initials (most 1)
+        const count = Math.random() < 0.7 ? 1 : (Math.random() < 0.85 ? 2 : 3);
+        for (let i = 0; i < count; i++) {
+            const type = Math.random() < 0.8 ? INITIAL_TYPE.STUDY : INITIAL_TYPE.VISIT;
+            const country = countries[Math.floor(Math.random() * countries.length)];
+            const unis = await University.find({ country: country._id }).limit(50);
+            const preferredUniversity = (unis && unis.length > 0 && Math.random() < 0.8) ? unis[Math.floor(Math.random() * unis.length)]._id : null;
+            const assigned = consultants[Math.floor(Math.random() * Math.max(1, consultants.length))];
+
+            const status = pickStatus();
+
+            const initialData = {
+                studentId: student._id,
+                type,
+                preferredCountry: country._id,
+                otherCountry: null,
+                preferredUniversity: preferredUniversity || null,
+                otherUniversity: preferredUniversity ? null : `Other Uni ${Math.random().toString(36).slice(2, 7)}`,
+                assignedConsultantId: assigned ? assigned._id : null,
+                notes: `Auto-generated initial for student ${student._id}`,
+                source: INITIAL_SOURCE.ONLINE,
+                status
+            };
+
+            if (status === INITIAL_STATUS.DECLINED || status === INITIAL_STATUS.REJECTED) {
+                const reviewer = assigned || consultants[0];
+                initialData.reviewedBy = reviewer ? reviewer.userId : null;
+                initialData.reviewedAt = new Date();
+                initialData.rejectionReason = 'Auto-generated rejection/decline for sample data';
+                initialData.markedBy = reviewer ? reviewer._id : null;
+                initialData.markedAt = new Date();
+            }
+
+            if (status === INITIAL_STATUS.DONE) {
+                const marker = assigned || consultants[0];
+                initialData.markedBy = marker ? marker._id : null;
+                initialData.markedAt = new Date();
+            }
+
+            const initial = await Initial.create(initialData);
+            initials.push(initial);
+        }
     }
 
     console.log(T + `${GREEN}Created ${initials.length} initials${RESET}`);
     return initials;
 };
 
+
 /**
- * Create applications (processes) with various states
+ * Create Processes (applications) for DONE initials.
  */
-const createApplications = async (initials, studentProfiles, staffProfiles, countries, universities, users) => {
-    console.log(`\n${CYAN}${A} Creating applications...${RESET}`);
+const createApplications = async (initials, studentProfiles, staffProfiles) => {
+    console.log(`\n${CYAN}${A} Creating applications (processes) for DONE initials...${RESET}`);
     const processes = [];
-    const consultants = staffProfiles.filter(sp => sp.staffRole === 'CONSULTANT');
-    const agents = staffProfiles.filter(sp => sp.staffRole === 'AGENT');
+    const staffById = {};
+    for (const s of staffProfiles) staffById[s._id.toString()] = s;
 
-    const statuses = [
-        PROCESS_STATUS.GATHERING_INFO,
-        PROCESS_STATUS.INFO_COMPLETE,
-        PROCESS_STATUS.INVOICE_PENDING,
-        PROCESS_STATUS.INVOICE_COMPLETE,
-        PROCESS_STATUS.DOCUMENTS_PENDING,
-        PROCESS_STATUS.DOCUMENTS_PROCESSING,
-        PROCESS_STATUS.DOCUMENTS_COMPLETE
-    ];
+    for (const initial of initials.filter(i => i.status === INITIAL_STATUS.DONE)) {
+        const student = studentProfiles.find(sp => sp._id.toString() === initial.studentId.toString());
+        if (!student) continue;
 
-    for (let i = 0; i < initials.length; i++) {
-        const initial = initials[i];
-        const student = studentProfiles[i];
-        const user = users.find(u => u._id.equals(student.userId));
-        const consultant = consultants[i % consultants.length];
-        const agent = agents[i % agents.length];
-        const status = statuses[i % statuses.length];
+        const user = await User.findById(student.userId).lean();
+        const consultantProfile = staffById[initial.assignedConsultantId?.toString()] || staffProfiles[Math.floor(Math.random() * staffProfiles.length)];
+        const consultantUserId = consultantProfile ? consultantProfile.userId : null;
 
-        const process = await Process.create({
+        const procData = {
             studentId: student._id,
             initialId: initial._id,
-            consultantId: consultant._id,
-            agentId: agent._id,
-            applicantData: {
-                firstName: user.firstName,
-                lastName: user.lastName,
-                email: user.email,
-                phone: user.phone.number,
-                dob: user.dob,
-                gender: user.gender,
-                nationality: student.nationality,
-                passportNumber: student.passportNumber,
-                passportExpiry: student.passportExpiry,
-                address: student.address,
-                educationLevel: student.educationLevel,
-                currentInstitution: student.currentInstitution,
-                graduationYear: student.graduationYear,
-                lastGpa: student.lastGpa,
-                englishProficiency: student.englishProficiency
-            },
-            targetCourse: `Computer Science - Year ${i % 4 + 1}`,
-            intakePreference: ['SPRING', 'SUMMER', 'FALL', 'WINTER', 'FLEXIBLE'][i % 5],
-            intakeYear: new Date().getFullYear() + (i % 3),
-            budget: {
-                amount: 20000 + Math.random() * 80000,
-                currency: ['USD', 'GBP', 'EUR'][i % 3]
-            },
-            status: status,
-            statusHistory: [
-                {
-                    status: PROCESS_STATUS.GATHERING_INFO,
-                    changedBy: consultant.userId,
-                    changedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-                    notes: 'Application started'
-                }
-            ]
-        });
-        processes.push(process);
-    }
+            consultantId: consultantProfile ? consultantProfile._id : null,
+            agentId: null,
 
-    console.log(T + `${GREEN}Created ${processes.length} applications${RESET}`);
-    return processes;
-};
+            applicantFirstName: user?.firstName || 'First',
+            applicantLastName: user?.lastName || 'Last',
+            applicantEmail: user?.email || null,
+            applicantPhone: user?.phone?.number || null,
+            applicantDob: user?.dob || null,
+            applicantGender: user?.gender || null,
+            visaType: initial.type,
 
-/**
- * Create tasks for applications
- */
-const createTasks = async (processes, users) => {
-    console.log(`\n${CYAN}${A} Creating tasks...${RESET}`);
-    const tasks = [];
+            nationality: student.nationality,
+            passportNumber: student.passportNumber,
+            passportExpiry: student.passportExpiry,
+            address: student.address || {},
+            educationLevel: student.educationLevel,
+            currentInstitution: student.currentInstitution,
+            graduationYear: student.graduationYear,
+            lastGpa: student.lastGpa,
+            englishProficiency: student.englishProficiency || {},
 
-    const taskTitles = [
-        'Submit Passport Copy',
-        'Provide Academic Transcripts',
-        'English Test Results',
-        'Personal Statement',
-        'Recommendation Letters',
-        'Financial Documents',
-        'Visa Application Form'
-    ];
+            targetCourse: `Target Course ${Math.random().toString(36).slice(2, 6)}`,
+            intakePreference: INTAKE_PREFERENCE.FLEXIBLE,
+            intakeYear: new Date().getFullYear(),
+            budget: {},
 
-    for (const process of processes) {
-        // Create 3-5 tasks per process
-        const numTasks = Math.floor(Math.random() * 3) + 3;
-        for (let i = 0; i < numTasks; i++) {
-            const task = await Task.create({
-                processId: process._id,
-                title: taskTitles[i % taskTitles.length],
-                description: `Task for process ${process._id}`,
-                status: [TASK_STATUS.PENDING, TASK_STATUS.IN_PROGRESS, TASK_STATUS.COMPLETED][
-                    Math.floor(Math.random() * 3)
-                ],
-                visibleToStudent: true,
-                createdBy: process.consultantId,
-                dueDate: new Date(Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000)
-            });
-            tasks.push(task);
+            status: PROCESS_STATUS.GATHERING_INFO,
+            statusHistory: [{ status: PROCESS_STATUS.GATHERING_INFO, changedBy: consultantUserId || user?._id, changedAt: new Date() }]
+        };
+
+        try {
+            const process = await Process.create(procData);
+            processes.push(process);
+        } catch (err) {
+            // ignore unique initial constraints or other issues in sample seeding
+            console.warn('Process create skipped:', err.message);
         }
     }
 
-    console.log(T + `${GREEN}Created ${tasks.length} tasks${RESET}`);
-    return tasks;
+    console.log(T + `${GREEN}Created ${processes.length} processes${RESET}`);
+    return processes;
 };
 
-/**
- * Create invoices
- */
-const createInvoices = async (processes, staffProfiles) => {
-    console.log(`\n${CYAN}${A} Creating invoices...${RESET}`);
-    const invoices = [];
-    const accountants = staffProfiles.filter(sp => sp.staffRole === 'ACCOUNTANT');
 
-    for (let i = 0; i < processes.length; i++) {
-        const process = processes[i];
-        const accountant = accountants[i % accountants.length];
+// Stubs for tasks, invoices and documents: left empty as requested
+const createTasks = async () => [];
+const createInvoices = async () => [];
+const createDocuments = async () => [];
 
-        const amount = 5000 + Math.random() * 15000;
-        const invoice = await Invoice.create({
-            processId: process._id,
-            accountantId: accountant._id,
-            paymentType: i % 2 === 0 ? 'DIRECT' : 'UNIVERSITY',
-            amount: amount,
-            currency: process.budget.currency || 'USD',
-            breakdown: [
-                { description: 'Tuition Fee', amount: amount * 0.7 },
-                { description: 'Processing Fee', amount: amount * 0.15 },
-                { description: 'Other Charges', amount: amount * 0.15 }
-            ],
-            status: [
-                INVOICE_STATUS.PENDING,
-                INVOICE_STATUS.STUDENT_CONTACTED,
-                INVOICE_STATUS.PAYMENT_RECEIVED,
-                INVOICE_STATUS.APPROVED
-            ][Math.floor(Math.random() * 4)],
-            issuedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
-            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            notes: `Invoice for process ${process._id}`
-        });
-        invoices.push(invoice);
-    }
-
-    console.log(T + `${GREEN}Created ${invoices.length} invoices${RESET}`);
-    return invoices;
-};
-
-/**
- * Create documents
- */
-const createDocuments = async (tasks, users) => {
-    console.log(`\n${CYAN}${A} Creating documents...${RESET}`);
-    const documents = [];
-
-    const docTypes = [
-        'PASSPORT',
-        'ACADEMIC_TRANSCRIPT',
-        'ENGLISH_TEST',
-        'RECOMMENDATION_LETTER',
-        'STATEMENT_OF_PURPOSE',
-        'CV_RESUME',
-        'FINANCIAL_DOCUMENT'
-    ];
-
-    for (const task of tasks) {
-        const docType = docTypes[Math.floor(Math.random() * docTypes.length)];
-        const status =
-            Math.random() > 0.3
-                ? [DOCUMENT_STATUS.UPLOADED, DOCUMENT_STATUS.VERIFIED][Math.floor(Math.random() * 2)]
-                : DOCUMENT_STATUS.PENDING;
-
-        const document = await Document.create({
-            taskId: task._id,
-            documentType: docType,
-            name: `${docType}_${task._id}`,
-            description: `Document for task ${task._id}`,
-            filePath: status !== DOCUMENT_STATUS.PENDING ? `/uploads/${docType}_${task._id}.pdf` : null,
-            status: status,
-            uploadedBy: status !== DOCUMENT_STATUS.PENDING ? users[0]._id : null,
-            uploadedAt: status !== DOCUMENT_STATUS.PENDING ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000) : null,
-            reviewedBy: status === DOCUMENT_STATUS.VERIFIED ? users[0]._id : null,
-            reviewedAt: status === DOCUMENT_STATUS.VERIFIED ? new Date() : null
-        });
-        documents.push(document);
-    }
-
-    console.log(T + `${GREEN}Created ${documents.length} documents${RESET}`);
-    return documents;
-};
 
 // ============================================
 // PRINT SUMMARY
@@ -856,13 +799,13 @@ const seedDatabase = async (options = {}) => {
         const users = await createUsers();
         const staffProfiles = await createStaffProfiles(users);
         const countries = await createCountries(staffProfiles);
-        const universities = await createUniversities(countries);
+        const activatedUnis = await activateUniversities(countries, staffProfiles);
         const studentProfiles = await createStudentProfiles(users);
         const initials = await createInitials(studentProfiles, countries, staffProfiles);
-        const processes = await createApplications(initials, studentProfiles, staffProfiles, countries, universities, users);
-        const tasks = await createTasks(processes, users);
-        const invoices = await createInvoices(processes, staffProfiles);
-        const documents = await createDocuments(tasks, users);
+        const processes = await createApplications(initials, studentProfiles, staffProfiles);
+        const tasks = await createTasks();
+        const invoices = await createInvoices();
+        const documents = await createDocuments();
 
         // Print summary
         await printSummary();
@@ -879,7 +822,7 @@ const seedDatabase = async (options = {}) => {
             users: users.length,
             staffProfiles: staffProfiles.length,
             countries: countries.length,
-            universities: universities.length,
+            universities: activatedUnis.length,
             studentProfiles: studentProfiles.length,
             initials: initials.length,
             processes: processes.length,
@@ -888,12 +831,14 @@ const seedDatabase = async (options = {}) => {
             documents: documents.length
         }
 
+        const unisFull = await University.find({ _id: { $in: activatedUnis } }).limit(100);
+
         const Responce = await wrapInHtml({
             summary,
             users: users,
             staffProfiles: staffProfiles,
             countries: countries,
-            universities: universities,
+            universities: unisFull,
             studentProfiles: studentProfiles,
             initials: initials,
             processes: processes,

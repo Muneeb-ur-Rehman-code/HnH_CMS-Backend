@@ -155,139 +155,142 @@ router.get('/deactivated', managerAuth, async (req, res) => {
         return sendResponse(res, false, null, error);
     }
 });
-
+/*
 // Create country (requires consultantId)
-router.post('/create', managerAuth, async (req, res) => {
-    try {
-        const { name, code, consultantId, visitConsultantId } = req.body || {};
+// router.post('/create', managerAuth, async (req, res) => {
+//     try {
+//         const { name, code, consultantId, visitConsultantId } = req.body || {};
 
-        // Validation Block
-        if (!name?.trim()) throw { status: 400, message: 'Country name is required.', code: 'NAME_REQUIRED' };
-        if (!code) throw { status: 400, message: 'Country code is required.', code: 'CODE_REQUIRED' };
+//         // Validation Block
+//         if (!name?.trim()) throw { status: 400, message: 'Country name is required.', code: 'NAME_REQUIRED' };
+//         if (!code) throw { status: 400, message: 'Country code is required.', code: 'CODE_REQUIRED' };
 
-        const formattedCode = validateAndFormatCode(code);
+//         const formattedCode = validateAndFormatCode(code);
 
-        // Required Consultant Validations
-        await validateStaffForAssignment(consultantId, STAFF_ROLE.CONSULTANT); // Study
-        await validateStaffForAssignment(visitConsultantId, STAFF_ROLE.VISIT);   // Visit
+//         // Required Consultant Validations
+//         await validateStaffForAssignment(consultantId, STAFF_ROLE.CONSULTANT); // Study
+//         await validateStaffForAssignment(visitConsultantId, STAFF_ROLE.VISIT);   // Visit
 
-        const country = await Country.create({
-            name: name.trim().toLowerCase(),
-            code: formattedCode,
-            consultantId,
-            visitConsultantId
-        });
+//         const country = await Country.create({
+//             name: name.trim().toLowerCase(),
+//             code: formattedCode,
+//             consultantId,
+//             visitConsultantId
+//         });
 
-        return sendResponse(res, true, country);
-    } catch (error) {
-        if (error.code === 11000) {
-            return sendResponse(res, false, null, { status: 409, message: 'Country code already exists.', code: 'DUPLICATE' });
-        }
-        return sendResponse(res, false, null, error);
-    }
-});
+//         return sendResponse(res, true, country);
+//     } catch (error) {
+//         if (error.code === 11000) {
+//             return sendResponse(res, false, null, { status: 409, message: 'Country code already exists.', code: 'DUPLICATE' });
+//         }
+//         return sendResponse(res, false, null, error);
+//     }
+// });
 
 // Update country (only name and code, not consultantId or deactivatedAt)
-router.put('/update/:id', managerAuth, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { name, code, consultantId, visitConsultantId, deactivatedAt } = req.body || {};
+// router.put('/update/:id', managerAuth, async (req, res) => {
+//     try {
+//         const { id } = req.params;
+//         const { name, code, consultantId, visitConsultantId, deactivatedAt } = req.body || {};
 
-        if (!id) {
-            const error = new Error('Country ID is required.');
-            error.status = 400;
-            error.code = 'ID_REQUIRED';
-            throw error;
-        }
+//         if (!id) {
+//             const error = new Error('Country ID is required.');
+//             error.status = 400;
+//             error.code = 'ID_REQUIRED';
+//             throw error;
+//         }
 
-        // Prevent updating consultantId or deactivatedAt through this route
-        if (consultantId !== undefined || deactivatedAt !== undefined || visitConsultantId !== undefined) {
-            const error = new Error('Cannot update consultantId or deactivatedAt through this route. Use assign-consultant, activate, or deactivate routes instead.');
-            error.status = 400;
-            error.code = 'INVALID_UPDATE_FIELD';
-            throw error;
-        }
+//         // Prevent updating consultantId or deactivatedAt through this route
+//         if (consultantId !== undefined || deactivatedAt !== undefined || visitConsultantId !== undefined) {
+//             const error = new Error('Cannot update consultantId or deactivatedAt through this route. Use assign-consultant, activate, or deactivate routes instead.');
+//             error.status = 400;
+//             error.code = 'INVALID_UPDATE_FIELD';
+//             throw error;
+//         }
 
-        const updateData = {};
-        if (name !== undefined) {
-            if (!name || !name.trim()) {
-                const error = new Error('Country name cannot be empty.');
-                error.status = 400;
-                error.code = 'INVALID_NAME';
-                throw error;
-            }
-            updateData.name = name.trim().toLowerCase();
-        }
+//         const updateData = {};
+//         if (name !== undefined) {
+//             if (!name || !name.trim()) {
+//                 const error = new Error('Country name cannot be empty.');
+//                 error.status = 400;
+//                 error.code = 'INVALID_NAME';
+//                 throw error;
+//             }
+//             updateData.name = name.trim().toLowerCase();
+//         }
 
-        if (code !== undefined) {
-            const formattedCode = validateAndFormatCode(code);
+//         if (code !== undefined) {
+//             const formattedCode = validateAndFormatCode(code);
 
-            // Prevent updating code to VST (Visit Visa) - reserved code
-            if (formattedCode === 'VST') {
-                const error = new Error('VST code is system-reserved for Visit Visa country. Please use a different code.');
-                error.status = 403;
-                error.code = 'VST_CODE_RESERVED';
-                throw error;
-            }
+//             // Prevent updating code to VST (Visit Visa) - reserved code
+//             if (formattedCode === 'VST') {
+//                 const error = new Error('VST code is system-reserved for Visit Visa country. Please use a different code.');
+//                 error.status = 403;
+//                 error.code = 'VST_CODE_RESERVED';
+//                 throw error;
+//             }
 
-            updateData.code = formattedCode;
-        }
+//             updateData.code = formattedCode;
+//         }
 
-        if (Object.keys(updateData).length === 0) {
-            const error = new Error('No valid fields to update.');
-            error.status = 400;
-            error.code = 'NO_UPDATE_DATA';
-            throw error;
-        }
+//         if (Object.keys(updateData).length === 0) {
+//             const error = new Error('No valid fields to update.');
+//             error.status = 400;
+//             error.code = 'NO_UPDATE_DATA';
+//             throw error;
+//         }
 
-        const country = await Country.findByIdAndUpdate(
-            id,
-            { $set: updateData },
-            { new: true, runValidators: true }
-        );
+//         const country = await Country.findByIdAndUpdate(
+//             id,
+//             { $set: updateData },
+//             { new: true, runValidators: true }
+//         );
 
-        if (!country) {
-            const error = new Error('Country not found.');
-            error.status = 404;
-            error.code = 'NOT_FOUND';
-            throw error;
-        }
+//         if (!country) {
+//             const error = new Error('Country not found.');
+//             error.status = 404;
+//             error.code = 'NOT_FOUND';
+//             throw error;
+//         }
 
-        return sendResponse(res, true, country);
-    } catch (error) {
-        if (error.code === 11000) {
-            const duplicateError = new Error('A country with this code already exists.');
-            duplicateError.status = 409;
-            duplicateError.code = 'DUPLICATE_CODE';
-            return sendResponse(res, false, null, duplicateError);
-        }
-        return sendResponse(res, false, null, error);
-    }
-});
+//         return sendResponse(res, true, country);
+//     } catch (error) {
+//         if (error.code === 11000) {
+//             const duplicateError = new Error('A country with this code already exists.');
+//             duplicateError.status = 409;
+//             duplicateError.code = 'DUPLICATE_CODE';
+//             return sendResponse(res, false, null, duplicateError);
+//         }
+//         return sendResponse(res, false, null, error);
+//     }
+// });
+*/
 
 // Activate country
 router.put('/activate/:id', managerAuth, async (req, res) => {
     try {
         const { id } = req.params;
 
-        if (!id) {
-            const error = new Error('Country ID is required.');
-            error.status = 400;
-            error.code = 'ID_REQUIRED';
-            throw error;
-        }
+        if (!id) throw { status: 400, message: 'Country ID is required.', code: 'ID_REQUIRED' };
+
+        const countryToCheck = await Country.findById(id).setOptions({ includeDeactivated: true });
+        if (!countryToCheck) throw { status: 404, message: 'Country not found.', code: 'NOT_FOUND' };
+
+        if (!countryToCheck.consultantId || !countryToCheck.visitConsultantId) throw { status: 400, message: 'Cannot activate: Both Study and Visit consultants must be assigned first.', code: 'ASSIGNMENT_REQUIRED' };
+        await Promise.all([
+            validateStaffForAssignment(countryToCheck.consultantId, STAFF_ROLE.CONSULTANT),
+            validateStaffForAssignment(countryToCheck.visitConsultantId, STAFF_ROLE.VISIT)
+        ]);
 
         const country = await Country.findByIdAndUpdate(
             id,
-            {
-                $set: { deactivatedAt: null }
-            },
+            { $set: { deactivatedAt: null } },
             {
                 new: true,
                 runValidators: true,
                 includeDeactivated: true
             }
-        );
+        ).populate(MANAGER_POPULATION);
 
         if (!country) {
             const error = new Error('Country not found.');
@@ -295,7 +298,6 @@ router.put('/activate/:id', managerAuth, async (req, res) => {
             error.code = 'NOT_FOUND';
             throw error;
         }
-
         return sendResponse(res, true, country);
     } catch (error) {
         return sendResponse(res, false, null, error);
@@ -307,12 +309,7 @@ router.delete('/deactivate/:id', managerAuth, async (req, res) => {
     try {
         const { id } = req.params;
 
-        if (!id) {
-            const error = new Error('Country ID is required.');
-            error.status = 400;
-            error.code = 'ID_REQUIRED';
-            throw error;
-        }
+        if (!id) throw { message: 'Country ID is required.', code: 'ID_REQUIRED', status: 400 }
 
         // Deactivate associated universities
         const country = await Country.findByIdAndUpdate(
@@ -321,12 +318,7 @@ router.delete('/deactivate/:id', managerAuth, async (req, res) => {
             { new: true }
         ).populate(MANAGER_POPULATION);
 
-        if (!country) {
-            const error = new Error('Country not found.');
-            error.status = 404;
-            error.code = 'NOT_FOUND';
-            throw error;
-        }
+        if (!country) throw { message: 'Country not found.', code: 'NOT_FOUND', status: 404 }
 
         return sendResponse(res, true, country);
     } catch (error) {

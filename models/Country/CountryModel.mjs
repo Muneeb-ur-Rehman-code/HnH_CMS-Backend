@@ -21,13 +21,13 @@ const countrySchema = new Schema(
         consultantId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'StaffProfile',
-            required: [true, 'consultantId (Study) is required'],
+            default: null,
             index: true
         },
         visitConsultantId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'StaffProfile',
-            required: [true, 'consultantId (Visit Visa) is required'],
+            default: null,
             index: true
         },
         deactivatedAt: {

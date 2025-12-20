@@ -3,7 +3,8 @@ import express from 'express';
 import { attachUser, requireRole } from '../../middlewares/Auth.mjs';
 import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
 import Invoice, { INVOICE_STATUS, PAYMENT_METHOD } from '../../models/Invoice/Invoice.mjs';
-import Process, { PROCESS_STATUS } from '../../models/Process/Process.mjs';
+import Process from '../../models/Process/Process.mjs';
+import { PROCESS_STATUS } from '../../config/enums.mjs';
 
 const router = express.Router();
 

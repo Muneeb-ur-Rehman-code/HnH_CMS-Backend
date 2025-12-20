@@ -4,7 +4,8 @@ import mongoose from 'mongoose';
 import { USER_ROLE } from '../../models/Users/_UsersMain.mjs';
 import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
 import Initial, { INITIAL_STATUS, INITIAL_TYPE } from '../../models/initial/Initial.mjs';
-import Process, { PROCESS_STATUS } from '../../models/Process/Process.mjs';
+import Process from '../../models/Process/Process.mjs';
+import { PROCESS_STATUS } from '../../config/enums.mjs';
 import StudentProfile from '../../models/Users/Student.mjs';
 import User from '../../models/Users/_UsersMain.mjs';
 import Invoice from '../../models/Invoice/Invoice.mjs';
@@ -45,9 +46,8 @@ router.get('/unassigned-initials', async (req, res) => {
     }
 });
 
-/*
 // Get all initials assigned to the consultant that are in the 'APPROVED' state
-router.get('/initials', requireConsultant, async (req, res) => {
+router.get('/initials', async (req, res) => {
     try {
         const consultantId = req.user.staffProfile._id;
         const initials = await Initial.find({
@@ -60,6 +60,103 @@ router.get('/initials', requireConsultant, async (req, res) => {
     }
 });
 
+
+
+// PUT: /self-assign/:id
+router.put('/self-assign/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const staffId = req.user?.staffProfile?._id;
+
+        if (!staffId) throw { status: 401, message: 'Staff profile not found in session', code: 'AUTH_ERROR' };
+
+        const initial = await Initial.findOne({ _id: id, status: INITIAL_STATUS.APPROVED, assignedConsultantId: null });
+        if (!initial) throw { status: 404, message: 'Initial not found or already assigned', code: 'NOT_AVAILABLE' };
+
+        initial.assignedConsultantId = staffId;
+        await initial.save();
+        return res.status(200).json({ success: true, message: 'Assigned successfully', data: initial });
+    } catch (error) {
+        return res.status(error.status || 500).json({ success: false, message: error.message, error: error.code || 'SERVER_ERROR' });
+    }
+});
+
+// PUT: /unassign-me/:id
+router.put('/unassign-me/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const staffId = req.user?.staffProfile?._id;
+
+        const initial = await Initial.findOne({ _id: id, assignedConsultantId: staffId });
+        if (!initial) throw { status: 404, message: 'Assignment not found', code: 'NOT_OWNER' };
+
+        if (initial.status !== INITIAL_STATUS.APPROVED) throw { status: 400, message: 'Cannot unassign processed requests', code: 'LOCKED' };
+
+        initial.assignedConsultantId = null;
+        await initial.save();
+        return res.status(200).json({ success: true, message: 'Unassigned successfully', data: initial });
+    } catch (error) {
+        return res.status(error.status || 500).json({ success: false, message: error.message, error: error.code || 'SERVER_ERROR' });
+    }
+});
+
+// PUT: /decline/:id
+router.put('/decline/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const staffId = req.user?.staffProfile?._id;
+
+        if (!staffId) throw { status: 401, message: 'Staff profile not found', code: 'AUTH_ERROR' };
+
+        const initial = await Initial.findOne({ _id: id, assignedConsultantId: staffId });
+        if (!initial) throw { status: 404, message: 'Initial not found or not assigned to you', code: 'NOT_FOUND' };
+
+        if (initial.status !== INITIAL_STATUS.APPROVED) throw { status: 400, message: `Cannot decline initial with status: ${initial.status}`, code: 'INVALID_STATUS' };
+
+        // 3. Use your model's instance method to update status, markedBy, and markedAt
+        await initial.markAsDeclined(staffId);
+
+        return res.status(200).json({ success: true, message: 'Initial marked as declined', data: initial });
+    } catch (error) {
+        return res.status(error.status || 500).json({ success: false, message: error.message, error: error.code || 'SERVER_ERROR' });
+    }
+});
+
+// GET: /my-declined
+router.get('/my-declined', async (req, res) => {
+    try {
+        const staffId = req.user?.staffProfile?._id;
+        if (!staffId) throw { status: 401, message: 'Staff profile not found', code: 'AUTH_ERROR' };
+
+        const initials = await Initial.find({ status: INITIAL_STATUS.DECLINED, markedBy: staffId }).sort({ markedAt: -1 }).populate('studentId', 'firstName lastName email');
+
+        return res.status(200).json({ success: true, count: initials.length, data: initials });
+    } catch (error) {
+        return res.status(error.status || 500).json({ success: false, message: error.message, error: error.code || 'SERVER_ERROR' });
+    }
+});
+
+// PUT: /restore-declined/:id
+router.put('/restore-declined/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const staffId = req.user?.staffProfile?._id;
+
+        const initial = await Initial.findOne({ _id: id, status: INITIAL_STATUS.DECLINED, markedBy: staffId });
+        if (!initial) throw { status: 404, message: 'Declined initial not found or not marked by you', code: 'NOT_FOUND' };
+
+        initial.status = INITIAL_STATUS.APPROVED;
+        initial.markedBy = null;
+        initial.markedAt = null;
+
+        await initial.save();
+        return res.status(200).json({ success: true, message: 'Initial restored to approved status', data: initial });
+    } catch (error) {
+        return res.status(error.status || 500).json({ success: false, message: error.message, error: error.code || 'SERVER_ERROR' });
+    }
+});
+
+/*
 
 
 // Decline an initial

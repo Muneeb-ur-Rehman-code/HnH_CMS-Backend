@@ -29,7 +29,6 @@ export const ENGLISH_TEST = Object.freeze({
     DUOLINGO: 'DUOLINGO',
     CAMBRIDGE: 'CAMBRIDGE',
     OTHER: 'OTHER',
-    NONE: 'NONE'
 });
 
 // ============================================
@@ -54,11 +53,12 @@ const addressSchema = new Schema(
             trim: true,
             maxlength: [100, 'State cannot exceed 100 characters'],
             default: null
-        },
-        postalCode: {
+        }, postalCode: {
             type: String,
             trim: true,
-            maxlength: [20, 'Postal code cannot exceed 20 characters'],
+            match: [/^\d{5}$/, 'Postal code must be exactly 5 digits.'],
+            maxlength: [5, 'Postal code cannot exceed 5 characters'],
+            minlength: [5, 'Postal code cannot e less than 5 characters'],
             default: null
         },
         country: {
@@ -77,7 +77,7 @@ const englishProficiencySchema = new Schema(
             type: String,
             enum: {
                 values: Object.values(ENGLISH_TEST),
-                message: 'Invalid English test type: {VALUE}'
+                message: 'Invalid English test type: {VALUE} go for IELTS TOEFL PTE DUOLINGO CAMBRIDGE OTHER'
             },
             default: ENGLISH_TEST.NONE
         },

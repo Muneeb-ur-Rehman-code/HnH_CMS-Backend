@@ -40,9 +40,6 @@ router.get('/profile', requireStudent, async (req, res) => {
                     email: user.email,
                     firstName: user.firstName,
                     lastName: user.lastName,
-                    phoneNumber: user?.phone?.number || null,
-                    dateOfBirth: user?.dob || null,
-                    gender: user.gender,
                     nationality: studentProfile?.nationality || null,
                     passportNumber: studentProfile?.passportNumber || null,
                     passportExpiry: studentProfile?.passportExpiry || null,
@@ -71,12 +68,6 @@ router.put('/profile', requireStudent, async (req, res) => {
     try {
         const user = req.user;
         const {
-            // User fields
-            firstName,
-            lastName,
-            dateOfBirth,
-            gender,
-            // Student profile fields
             nationality,
             passportNumber,
             passportExpiry,
@@ -88,14 +79,7 @@ router.put('/profile', requireStudent, async (req, res) => {
             englishProficiency
         } = req.body;
 
-        // Update user basic info
-        if (firstName !== undefined) user.firstName = firstName;
-        if (lastName !== undefined) user.lastName = lastName;
-        if (dateOfBirth !== undefined) user.dob = dateOfBirth;
-        if (gender !== undefined) user.gender = gender;
-        await user.save();
 
-        // Update or create student profile
         let studentProfile = await StudentProfile.findOne({ userId: user._id });
 
         if (!studentProfile) {
@@ -105,13 +89,31 @@ router.put('/profile', requireStudent, async (req, res) => {
         if (nationality !== undefined) studentProfile.nationality = nationality;
         if (passportNumber !== undefined) studentProfile.passportNumber = passportNumber;
         if (passportExpiry !== undefined) studentProfile.passportExpiry = passportExpiry;
-        if (address !== undefined) studentProfile.address = address;
         if (educationLevel !== undefined) studentProfile.educationLevel = educationLevel;
         if (currentInstitution !== undefined) studentProfile.currentInstitution = currentInstitution;
         if (graduationYear !== undefined) studentProfile.graduationYear = graduationYear;
         if (lastGpa !== undefined) studentProfile.lastGpa = lastGpa;
-        if (englishProficiency !== undefined) studentProfile.englishProficiency = englishProficiency;
 
+
+        if (address !== undefined) {
+            const addresser = {
+                street: address?.street || null,
+                city: address?.city || null,
+                state: address?.state || null,
+                country: address?.country || null,
+                postalCode: address?.postalCode || null
+            }
+            studentProfile.address = addresser;
+        }
+
+        if (englishProficiency !== undefined) {
+            const englisher = {
+                testType: englishProficiency?.testType || null,
+                overallScore: englishProficiency?.overallScore || null,
+                testDate: englishProficiency?.testDate || null,
+            }
+            studentProfile.englishProficiency = englisher;
+        }
         await studentProfile.save();
 
         return res.status(200).json({
@@ -149,6 +151,8 @@ router.put('/profile', requireStudent, async (req, res) => {
         });
     }
 });
+
+
 
 
 // /api/student/initials
@@ -202,7 +206,6 @@ router.get('/initials', requireStudent, async (req, res) => {
     }
 });
 
-
 // /api/student/initials
 router.post('/initials', requireStudent, async (req, res) => {
     try {
@@ -236,18 +239,20 @@ router.post('/initials', requireStudent, async (req, res) => {
             });
         }
 
-        // Validation: Check for existing application
-        const existingInitial = await Initial.findOne({
-            studentId: studentProfile._id,
-            status: { $in: [INITIAL_STATUS.PENDING, INITIAL_STATUS.REJECTED, INITIAL_STATUS.APPROVED] }
-        });
+        /* Update now we can have multiple
+         Validation: Check for existing application
+         const existingInitial = await Initial.findOne({
+             studentId: studentProfile._id,
+             status: { $in: [INITIAL_STATUS.PENDING, INITIAL_STATUS.REJECTED, INITIAL_STATUS.APPROVED] }
+         });
 
-        if (existingInitial) {
-            return res.status(400).json({
-                success: false,
-                message: `You already have an application with '${existingInitial.status}' status. Please delete it first before creating a new one.`
-            });
-        }
+         if (existingInitial) {
+             return res.status(400).json({
+                 success: false,
+                 message: `You already have an application with '${existingInitial.status}' status. Please delete it first before creating a new one.`
+             });
+         } */
+
 
         // Prepare initial data
         const initialData = {

@@ -3,9 +3,9 @@ import Country from '../../models/Country/CountryModel.mjs';
 import StaffProfile from '../../models/Users/StaffProfile.mjs';
 import User from '../../models/Users/_UsersMain.mjs';
 import University from '../../models/University/UniModel.mjs';
-import { requireFullAuth, requireManager } from '../../middlewares/Auth.mjs';
+import { requireFullAuth, requireManager, optionalAttachUser } from '../../middlewares/Auth.mjs';
 import { STAFF_ROLE, STAFF_VERIFICATION_STATUS } from '../../models/Users/StaffProfile.mjs';
-import { USER_STATUS } from '../../models/Users/_UsersMain.mjs';
+import { USER_STATUS, USER_ROLE } from '../../models/Users/_UsersMain.mjs';
 
 const router = Router();
 
@@ -41,82 +41,101 @@ const validateAndFormatCode = (code) => {
 };
 
 // Validate consultant is active and has CONSULTANT role
-const validateConsultant = async (staffProfileId) => {
-    const staffProfile = await StaffProfile.findById(staffProfileId);
-    if (!staffProfile) {
-        const error = new Error('Consultant not found.');
-        error.status = 404;
-        error.code = 'CONSULTANT_NOT_FOUND';
-        throw error;
+const validateStaffForAssignment = async (staffId, expectedRole) => {
+    // 1. Check if ID was even provided
+    if (!staffId) {
+        throw { status: 400, message: `${expectedRole} consultant ID is required.`, code: 'ID_REQUIRED' };
     }
 
-    if (staffProfile.staffRole !== STAFF_ROLE.CONSULTANT) {
-        const error = new Error('Only consultants can be assigned to countries.');
-        error.status = 400;
-        error.code = 'INVALID_STAFF_ROLE';
-        throw error;
+    // 2. Fetch and populate user
+    const staff = await StaffProfile.findById(staffId).populate('userId');
+
+    if (!staff) {
+        throw { status: 404, message: 'Consultant profile not found.', code: 'STAFF_NOT_FOUND' };
     }
 
-    const user = await User.findById(staffProfile.userId);
-    if (!user || user.status !== USER_STATUS.ACTIVE) {
-        const error = new Error('Consultant must be ACTIVE to be assigned to a country.');
-        error.status = 400;
-        error.code = 'CONSULTANT_NOT_ACTIVE';
-        throw error;
+    // 3. Check Role
+    if (staff.staffRole !== expectedRole) {
+        throw { status: 400, message: `Invalid Role: Expected ${expectedRole}, got ${staff.staffRole}`, code: 'INVALID_ROLE' };
     }
+
+    // 4. Check Verification
+    if (staff.verificationStatus !== STAFF_VERIFICATION_STATUS.VERIFIED) {
+        throw { status: 403, message: 'Consultant must be VERIFIED by a manager first.', code: 'CONSULTANT_NOT_VERIFIED' };
+    }
+
+    // 5. Check User Account Status
+    if (!staff.userId || staff.userId.status !== USER_STATUS.ACTIVE) {
+        throw { status: 403, message: 'The user account for this consultant is not active.', code: 'USER_INACTIVE' };
+    }
+
+    return staff;
 };
 
-// Get all countries (without consultantId, excluding VST)
-router.get('/', async (req, res) => {
+const MANAGER_POPULATION = [
+    {
+        path: 'consultantId',
+        select: 'userId staffRole verificationStatus',
+        populate: { path: 'userId', select: 'firstName lastName email' }
+    },
+    {
+        path: 'visitConsultantId',
+        select: 'userId staffRole verificationStatus',
+        populate: { path: 'userId', select: 'firstName lastName email' }
+    }
+];
+
+// Combined Get All
+router.get('/', optionalAttachUser, async (req, res) => {
     try {
-        const countries = await Country.find({
-            deactivatedAt: null,
-            code: { $ne: 'VST' } // Exclude Visit Visa country
-        })
-            .select('-consultantId')
-            .sort({ name: 1 });
+        const staff = req.user ? await StaffProfile.findOne({ userId: req.userId }) : null;
+        const isManager = staff?.staffRole === STAFF_ROLE.MANAGER && staff?.verificationStatus === STAFF_VERIFICATION_STATUS.VERIFIED;
+
+        let query = Country.find().sort({ name: 1 });
+
+        if (isManager) {
+            query = query.populate(MANAGER_POPULATION);
+        } else {
+            query = query.select('name code'); // Public view: Hide ALL consultant IDs
+        }
+
+        const countries = await query;
         return sendResponse(res, true, countries);
     } catch (error) {
         return sendResponse(res, false, null, error);
     }
 });
 
+
 // Search countries (without consultantId)
-router.get('/search', async (req, res) => {
+router.get('/search', optionalAttachUser, async (req, res) => {
     try {
         const { search } = req.query;
-
-        if (!search || typeof search !== 'string' || search.trim().length < 2) {
-            const error = new Error('Search term must be at least 2 characters long.');
-            error.status = 400;
-            error.code = 'INVALID_SEARCH_TERM';
-            throw error;
+        if (!search || search.trim().length < 2) {
+            throw { status: 400, message: 'Search term must be at least 2 chars', code: 'INVALID_SEARCH' };
         }
 
-        const term = search.toLowerCase().trim();
-        const uppercaseTerm = search.toUpperCase().trim();
+        const staff = req.user?.role === USER_ROLE.STAFF ? await StaffProfile.findOne({ userId: req.userId }) : null;
+        const isVerifiedManager = staff?.staffRole === STAFF_ROLE.MANAGER && staff?.verificationStatus === STAFF_VERIFICATION_STATUS.VERIFIED;
 
-        const query = {
+        const term = search.trim();
+        const filter = {
             deactivatedAt: null,
-            code: { $ne: 'VST' }, // Exclude Visit Visa country
             $or: [
                 { name: { $regex: term, $options: 'i' } },
-                { code: uppercaseTerm }
+                { code: term.toUpperCase() }
             ]
         };
 
-        const countries = await Country.find(query)
-            .select('-consultantId')
-            .limit(10)
-            .sort({ name: 1 });
+        let query = Country.find(filter).limit(10).sort({ name: 1 });
 
-        if (countries.length === 0) {
-            const error = new Error('No active countries matched the search term.');
-            error.status = 404;
-            error.code = 'NOT_FOUND';
-            throw error;
+        if (isVerifiedManager) {
+            query = query.populate(MANAGER_POPULATION);
+        } else {
+            query = query.select('name code');
         }
 
+        const countries = await query;
         return sendResponse(res, true, countries);
     } catch (error) {
         return sendResponse(res, false, null, error);
@@ -126,7 +145,9 @@ router.get('/search', async (req, res) => {
 // Get deactivated countries
 router.get('/deactivated', managerAuth, async (req, res) => {
     try {
-        const countries = await Country.find({ deactivatedAt: { $ne: null } })
+        const query = Country.find({ deactivatedAt: { $ne: null } });
+        query.setOptions({ includeDeactivated: true });
+        const countries = await query
             .select('-consultantId')
             .sort({ name: 1 });
         return sendResponse(res, true, countries);
@@ -138,54 +159,29 @@ router.get('/deactivated', managerAuth, async (req, res) => {
 // Create country (requires consultantId)
 router.post('/create', managerAuth, async (req, res) => {
     try {
-        const { name, code, consultantId } = req.body;
+        const { name, code, consultantId, visitConsultantId } = req.body || {};
 
-        if (!name || !name.trim()) {
-            const error = new Error('Country name is required.');
-            error.status = 400;
-            error.code = 'NAME_REQUIRED';
-            throw error;
-        }
-
-        if (!code) {
-            const error = new Error('Country code is required.');
-            error.status = 400;
-            error.code = 'CODE_REQUIRED';
-            throw error;
-        }
+        // Validation Block
+        if (!name?.trim()) throw { status: 400, message: 'Country name is required.', code: 'NAME_REQUIRED' };
+        if (!code) throw { status: 400, message: 'Country code is required.', code: 'CODE_REQUIRED' };
 
         const formattedCode = validateAndFormatCode(code);
 
-        // Prevent manual creation of VST (Visit Visa) country
-        if (formattedCode === 'VST') {
-            const error = new Error('VST code is system-reserved for Visit Visa country. Please use a different code.');
-            error.status = 403;
-            error.code = 'VST_CODE_RESERVED';
-            throw error;
-        }
-
-        if (!consultantId) {
-            const error = new Error('Consultant ID is required.');
-            error.status = 400;
-            error.code = 'CONSULTANT_ID_REQUIRED';
-            throw error;
-        }
-
-        await validateConsultant(consultantId);
+        // Required Consultant Validations
+        await validateStaffForAssignment(consultantId, STAFF_ROLE.CONSULTANT); // Study
+        await validateStaffForAssignment(visitConsultantId, STAFF_ROLE.VISIT);   // Visit
 
         const country = await Country.create({
             name: name.trim().toLowerCase(),
             code: formattedCode,
-            consultantId
+            consultantId,
+            visitConsultantId
         });
 
-        return res.status(201).json({ success: true, data: country });
+        return sendResponse(res, true, country);
     } catch (error) {
         if (error.code === 11000) {
-            const duplicateError = new Error('A country with this code already exists.');
-            duplicateError.status = 409;
-            duplicateError.code = 'DUPLICATE_CODE';
-            return sendResponse(res, false, null, duplicateError);
+            return sendResponse(res, false, null, { status: 409, message: 'Country code already exists.', code: 'DUPLICATE' });
         }
         return sendResponse(res, false, null, error);
     }
@@ -195,7 +191,7 @@ router.post('/create', managerAuth, async (req, res) => {
 router.put('/update/:id', managerAuth, async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, code, consultantId, deactivatedAt } = req.body;
+        const { name, code, consultantId, visitConsultantId, deactivatedAt } = req.body || {};
 
         if (!id) {
             const error = new Error('Country ID is required.');
@@ -205,7 +201,7 @@ router.put('/update/:id', managerAuth, async (req, res) => {
         }
 
         // Prevent updating consultantId or deactivatedAt through this route
-        if (consultantId !== undefined || deactivatedAt !== undefined) {
+        if (consultantId !== undefined || deactivatedAt !== undefined || visitConsultantId !== undefined) {
             const error = new Error('Cannot update consultantId or deactivatedAt through this route. Use assign-consultant, activate, or deactivate routes instead.');
             error.status = 400;
             error.code = 'INVALID_UPDATE_FIELD';
@@ -283,8 +279,14 @@ router.put('/activate/:id', managerAuth, async (req, res) => {
 
         const country = await Country.findByIdAndUpdate(
             id,
-            { $set: { deactivatedAt: null } },
-            { new: true, runValidators: true }
+            {
+                $set: { deactivatedAt: null }
+            },
+            {
+                new: true,
+                runValidators: true,
+                includeDeactivated: true
+            }
         );
 
         if (!country) {
@@ -313,16 +315,11 @@ router.delete('/deactivate/:id', managerAuth, async (req, res) => {
         }
 
         // Deactivate associated universities
-        await University.updateMany(
-            { country: id, deactivatedAt: null },
-            { $set: { deactivatedAt: new Date() } }
-        );
-
         const country = await Country.findByIdAndUpdate(
             id,
             { $set: { deactivatedAt: new Date() } },
             { new: true }
-        );
+        ).populate(MANAGER_POPULATION);
 
         if (!country) {
             const error = new Error('Country not found.');
@@ -337,146 +334,52 @@ router.delete('/deactivate/:id', managerAuth, async (req, res) => {
     }
 });
 
+
 // Assign consultant (replaces previous consultant)
-router.put('/assign-consultant/:id', managerAuth, async (req, res) => {
+router.put('/assign-study/:id', managerAuth, async (req, res) => {
     try {
         const { id } = req.params;
-        const { consultantId } = req.body;
+        const { consultantId } = req.body || {};
 
-        if (!id) {
-            const error = new Error('Country ID is required.');
-            error.status = 400;
-            error.code = 'ID_REQUIRED';
-            throw error;
-        }
+        if (!id) throw { status: 400, message: 'Country ID required', code: 'ID_MISSING' };
 
-        if (!consultantId) {
-            const error = new Error('Consultant ID is required.');
-            error.status = 400;
-            error.code = 'CONSULTANT_ID_REQUIRED';
-            throw error;
-        }
-
-        await validateConsultant(consultantId);
+        await validateStaffForAssignment(consultantId, STAFF_ROLE.CONSULTANT);
 
         const country = await Country.findByIdAndUpdate(
             id,
             { $set: { consultantId } },
-            { new: true }
-        );
+            { new: true, includeDeactivated: true }
+        ).populate(MANAGER_POPULATION);
 
-        if (!country) {
-            const error = new Error('Country not found.');
-            error.status = 404;
-            error.code = 'NOT_FOUND';
-            throw error;
-        }
-
+        if (!country) throw { status: 404, message: 'Country not found', code: 'NOT_FOUND' };
         return sendResponse(res, true, country);
     } catch (error) {
         return sendResponse(res, false, null, error);
     }
 });
 
-// Get Visit Visa consultant
-router.get('/visit-visa-consultant', managerAuth, async (req, res) => {
+// Assign/Swap Visit Consultant
+router.put('/assign-visit/:id', managerAuth, async (req, res) => {
     try {
-        const vstCountry = await Country.findOne({ code: 'VST', deactivatedAt: null })
-            .populate('consultantId', 'staffRole verificationStatus')
-            .populate({
-                path: 'consultantId',
-                populate: { path: 'userId', select: 'email firstName lastName phoneNumber status' }
-            });
+        const { id } = req.params;
+        const { visitConsultantId } = req.body || {};
 
-        if (!vstCountry || !vstCountry.consultantId) {
-            return sendResponse(res, true, { consultant: null, isVisitVisaConsultant: false });
-        }
+        if (!id) throw { status: 400, message: 'Country ID required', code: 'ID_MISSING' };
 
-        return sendResponse(res, true, {
-            consultant: vstCountry.consultantId,
-            isVisitVisaConsultant: true
-        });
+        await validateStaffForAssignment(visitConsultantId, STAFF_ROLE.VISIT);
+
+        const country = await Country.findByIdAndUpdate(
+            id,
+            { $set: { visitConsultantId } },
+            { new: true, includeDeactivated: true }
+        ).populate(MANAGER_POPULATION);
+
+        if (!country) throw { status: 404, message: 'Country not found', code: 'NOT_FOUND' };
+        return sendResponse(res, true, country);
     } catch (error) {
         return sendResponse(res, false, null, error);
     }
 });
 
-// Assign Visit Visa consultant
-router.put('/visit-visa-consultant/assign', managerAuth, async (req, res) => {
-    try {
-        const { consultantId } = req.body;
-
-        if (!consultantId) {
-            const error = new Error('Consultant ID is required.');
-            error.status = 400;
-            error.code = 'CONSULTANT_ID_REQUIRED';
-            throw error;
-        }
-
-        await validateConsultant(consultantId);
-
-        // Check if consultant is verified
-        const staffProfile = await StaffProfile.findById(consultantId);
-        if (staffProfile.verificationStatus !== STAFF_VERIFICATION_STATUS.VERIFIED) {
-            const error = new Error('Consultant must be verified to be assigned as Visit Visa consultant.');
-            error.status = 400;
-            error.code = 'CONSULTANT_NOT_VERIFIED';
-            throw error;
-        }
-
-        // Find or create VST country (internal system use only)
-        let vstCountry = await Country.findOne({ code: 'VST' });
-
-        if (!vstCountry) {
-            // Create VST country (internal)
-            vstCountry = await Country.create({
-                name: 'visit visa',
-                code: 'VST',
-                consultantId
-            });
-        } else {
-            // Update existing VST country
-            vstCountry.consultantId = consultantId;
-            vstCountry.deactivatedAt = null; // Ensure it's active
-            await vstCountry.save();
-        }
-
-        // Return only consultant information
-        const consultant = await StaffProfile.findById(consultantId)
-            .populate('userId', 'email firstName lastName phoneNumber status');
-
-        return sendResponse(res, true, {
-            consultant,
-            isVisitVisaConsultant: true,
-            message: 'Consultant assigned as Visit Visa consultant successfully'
-        });
-    } catch (error) {
-        return sendResponse(res, false, null, error);
-    }
-});
-
-// Remove Visit Visa consultant
-router.delete('/visit-visa-consultant', managerAuth, async (req, res) => {
-    try {
-        const vstCountry = await Country.findOne({ code: 'VST' });
-
-        if (!vstCountry || !vstCountry.consultantId) {
-            const error = new Error('Visit Visa consultant not found.');
-            error.status = 404;
-            error.code = 'NOT_FOUND';
-            throw error;
-        }
-
-        // Delete VST country (internal system cleanup)
-        await Country.findByIdAndDelete(vstCountry._id);
-
-        return sendResponse(res, true, {
-            message: 'Visit Visa consultant access removed successfully',
-            isVisitVisaConsultant: false
-        });
-    } catch (error) {
-        return sendResponse(res, false, null, error);
-    }
-});
 
 export default router;

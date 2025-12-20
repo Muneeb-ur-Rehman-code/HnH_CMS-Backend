@@ -9,15 +9,19 @@ const { Schema, model } = mongoose;
 export const INITIAL_SOURCE = Object.freeze({
     MARKETING: 'MARKETING',
     WALK_IN: 'WALK_IN',
-    ONLINE: 'ONLINE'
+    ONLINE: 'ONLINE',
+    MARNAGER: 'MANAGER'
 });
 
 export const INITIAL_STATUS = Object.freeze({
+    //manager
     PENDING: 'PENDING',
     APPROVED: 'APPROVED',
     REJECTED: 'REJECTED',
+    //consultant
     DONE: 'DONE',
     DECLINED: 'DECLINED',
+    //user
     REFUSED: 'REFUSED'
 });
 
@@ -38,10 +42,11 @@ const initialSchema = new Schema(
             index: true
         },
 
+
         type: {
             type: String,
             enum: {
-                values: Object.values(INITIAL_TYPE),
+                values: Object.values(INITIAL_TYPE),//STUDY VISIT
                 message: 'Invalid type: {VALUE}'
             },
             required: [true, 'Type is required'],
@@ -49,13 +54,13 @@ const initialSchema = new Schema(
             index: true
         },
 
+
         preferredCountry: {
             type: Schema.Types.Mixed,
             default: null,
             validate: {
                 validator: function (value) {
                     if (value === null || value === undefined) return true;
-                    // Can be ObjectId or "OTHER" string
                     if (value === 'OTHER') return true;
                     return mongoose.Types.ObjectId.isValid(value);
                 },
@@ -63,7 +68,6 @@ const initialSchema = new Schema(
             },
             required: [true, 'Preferred country is required']
         },
-
         otherCountry: {
             type: String,
             trim: true,
@@ -71,26 +75,26 @@ const initialSchema = new Schema(
             default: null
         },
 
+
         preferredUniversity: {
             type: Schema.Types.Mixed,
             default: null,
             validate: {
                 validator: function (value) {
                     if (value === null || value === undefined) return true;
-                    // Can be ObjectId or "OTHER" string
                     if (value === 'OTHER') return true;
                     return mongoose.Types.ObjectId.isValid(value);
                 },
                 message: 'Preferred university must be a valid University ID or "OTHER"'
             }
         },
-
         otherUniversity: {
             type: String,
             trim: true,
             maxlength: [200, 'Other university cannot exceed 200 characters'],
             default: null
         },
+
 
         assignedConsultantId: {
             type: Schema.Types.ObjectId,
@@ -126,6 +130,9 @@ const initialSchema = new Schema(
             index: true
         },
 
+
+        //APPROVAL
+
         reviewedBy: {
             type: Schema.Types.ObjectId,
             ref: 'User',
@@ -143,6 +150,9 @@ const initialSchema = new Schema(
             maxlength: [500, 'Rejection reason cannot exceed 500 characters'],
             default: null
         },
+
+
+        //WHEN DONE
 
         markedBy: {
             type: Schema.Types.ObjectId,

@@ -67,8 +67,10 @@ export const optionalAttachUser = async (req, res, next) => {
         if (!authHeader) return next();
 
         await attachUserCore(req);
+        console.log(req.user)
         return next();
     } catch (error) {
+        console.log(error);
         return next();
     }
 };

@@ -1,10 +1,9 @@
 // routes/Consultant/Consultant.mjs
 import express from 'express';
 import mongoose from 'mongoose';
-import { attachUser, requireRole } from '../../middlewares/Auth.mjs';
 import { USER_ROLE } from '../../models/Users/_UsersMain.mjs';
 import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
-import Initial, { INITIAL_STATUS } from '../../models/initial/Initial.mjs';
+import Initial, { INITIAL_STATUS, INITIAL_TYPE } from '../../models/initial/Initial.mjs';
 import Process, { PROCESS_STATUS } from '../../models/Process/Process.mjs';
 import StudentProfile from '../../models/Users/Student.mjs';
 import User from '../../models/Users/_UsersMain.mjs';
@@ -15,11 +14,38 @@ import Document from '../../models/Docx/Document.mjs';
 
 const router = express.Router();
 
-const requireConsultant = [
-    attachUser,
-    requireRole(STAFF_ROLE.CONSULTANT),
-];
 
+
+router.get('/unassigned-initials', async (req, res) => {
+    try {
+        const rtype = req.rtype;
+        const query = {
+            status: INITIAL_STATUS.APPROVED,
+            assignedConsultantId: null
+        };
+        if (rtype === 'STUDY') {
+            query.type = INITIAL_TYPE.STUDY;
+        } else if (rtype === 'VISIT') {
+            query.type = INITIAL_TYPE.VISIT;
+        }
+        const initials = await Initial.find(query)
+            .populate('studentId', 'firstName lastName email')
+            .sort({ createdAt: -1 });
+        return res.status(200).json({
+            success: true,
+            count: initials.length,
+            data: initials
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: 'Server Error fetching initials',
+            error: error.message
+        });
+    }
+});
+
+/*
 // Get all initials assigned to the consultant that are in the 'APPROVED' state
 router.get('/initials', requireConsultant, async (req, res) => {
     try {
@@ -33,6 +59,8 @@ router.get('/initials', requireConsultant, async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to fetch initials', error: error.message });
     }
 });
+
+
 
 // Decline an initial
 router.patch('/initials/:initialId/decline', requireConsultant, async (req, res) => {
@@ -287,6 +315,6 @@ router.patch('/documents/:documentId/review', requireConsultant, async (req, res
         res.status(400).json({ success: false, message: error.message });
     }
 });
-
+*/
 
 export default router;

@@ -32,7 +32,7 @@ import Process from '../models/Process/Process.mjs';
 import { PROCESS_STATUS, INTAKE_PREFERENCE, CURRENCY } from '../config/enums.mjs';
 import Task, { TASK_STATUS } from '../models/Task/Tasks.mjs';
 import Invoice, { INVOICE_STATUS, INVOICE_PAYMENT_TYPE, PAYMENT_METHOD } from '../models/Invoice/Invoice.mjs';
-import Document, { DOCUMENT_TYPE, DOCUMENT_STATUS } from '../models/Docx/Document.mjs';
+import Document, { DOCUMENT_STATUS } from '../models/Docx/Document.mjs';
 
 // ============================================
 // DATABASE CONNECTION

@@ -12,7 +12,8 @@ export const INVOICE_STATUS = Object.freeze({
     PAYMENT_RECEIVED: 'PAYMENT_RECEIVED',    // Payment info recorded by student/accountant
     APPROVED: 'APPROVED',             // Payment verified and approved
     REJECTED: 'REJECTED',             // Payment rejected by accountant
-    CANCELLED: 'CANCELLED'            // Invoice cancelled
+    WITHDRAWN: 'WITHDRAWN',            // Invoice cancelled by student
+    CANCELLED: 'CANCELLED'                // Invoice declined by consultant
 });
 
 export const INVOICE_PAYMENT_TYPE = Object.freeze({
@@ -42,9 +43,13 @@ const paymentTrackingSchema = new Schema({
     paymentMethod: { type: String, enum: { values: Object.values(PAYMENT_METHOD), message: 'Invalid payment method: {VALUE}' }, required: true },
     transactionId: { type: String, trim: true, default: null },
     filePath: { type: String, trim: true, default: null }, // Path to receipt/screenshot
+    status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING' },
     recordedAt: { type: Date, default: Date.now },
-    recordedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
-}, { _id: false });
+    recordedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    reviewReason: { type: String, trim: true, maxlength: [500, 'Review reason cannot exceed 500 characters'], default: null }
+}, { _id: true });
 
 // ============================================
 // MAIN SCHEMA DEFINITION
@@ -68,12 +73,12 @@ const invoiceSchema = new Schema({
         }
     },
     status: { type: String, enum: { values: Object.values(INVOICE_STATUS), message: 'Invalid invoice status: {VALUE}' }, default: INVOICE_STATUS.PENDING, index: true },
-    paymentTracking: { type: paymentTrackingSchema, default: null },
+    paymentTracking: {
+        type: [paymentTrackingSchema],
+        default: []
+    },
     issuedAt: { type: Date, default: Date.now, required: true },
     dueDate: { type: Date, default: null },
-    reviewedAt: { type: Date, default: null },
-    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-    reviewReason: { type: String, trim: true, maxlength: [500, 'Review reason cannot exceed 500 characters'], default: null },
     notes: { type: String, trim: true, maxlength: [1000, 'Notes cannot exceed 1000 characters'], default: null },
 }, { timestamps: true });
 
@@ -89,7 +94,9 @@ invoiceSchema.index({ issuedAt: -1 });
 // ============================================
 invoiceSchema.virtual('isApproved').get(function () { return this.status === INVOICE_STATUS.APPROVED; });
 invoiceSchema.virtual('isCancelled').get(function () { return this.status === INVOICE_STATUS.CANCELLED; });
-invoiceSchema.virtual('isPaid').get(function () { return this.paymentTracking !== null; });
+invoiceSchema.virtual('hasPaidTracking').get(function () {
+    return this.paymentTracking && this.paymentTracking.length > 0;
+});
 invoiceSchema.virtual('isOverdue').get(function () {
     if (!this.dueDate || this.isApproved || this.isCancelled) return false;
     return new Date() > this.dueDate;

@@ -38,6 +38,7 @@ export const INITIAL_STATUS = Object.freeze({
     DECLINED: 'DECLINED',
     REFUSED: 'REFUSED'
 });
+
 export const PROCESS_STATUS = Object.freeze({
 
     PROGRESS: 'PROGRESS',    	    // Evrything IN progress
@@ -49,9 +50,9 @@ export const PROCESS_STATUS = Object.freeze({
     REJECTED: 'REJECTED',    	    // EVERYTHING DONE IS ALSO REJECTED (BY MANAGER)
 
     REFUND_PEND: 'REFUND-PEND',  	// REFUND APPLIED
-    REFUND_APPR: 'REFUND-APPR',  	// REFUND APPLIED
-    REFUND_REJC: 'REFUND-REJC',  	// REFUND APPLIED
-    REFUND_COMP: 'REFUND-COMP',  	// REFUND APPLIED
+    REFUND_APPR: 'REFUND-APPR',  	// REFUND approved
+    REFUND_REJC: 'REFUND-REJC',  	// REFUND rejected
+    REFUND_COMP: 'REFUND-COMP',  	// REFUND completed
 
     WITHDRAWN: 'WITHDRAWN',     	// CACELLED BY THE USER
 

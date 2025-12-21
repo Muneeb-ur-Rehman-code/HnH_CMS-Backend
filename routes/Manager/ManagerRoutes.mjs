@@ -5,6 +5,8 @@ import StudentProfile from '../../models/Users/Student.mjs';
 import Initial from '../../models/initial/Initial.mjs';
 import Country from '../../models/Country/CountryModel.mjs';
 import University from '../../models/University/UniModel.mjs';
+import Process from '../../models/Process/Process.mjs';
+import { PROCESS_STATUS } from '../../config/enums.mjs';
 import { STAFF_ROLE, STAFF_VERIFICATION_STATUS } from '../../models/Users/StaffProfile.mjs';
 import { INITIAL_STATUS, INITIAL_SOURCE, INITIAL_TYPE } from '../../models/initial/Initial.mjs';
 import { USER_ROLE, USER_STATUS, USER_SOURCE } from '../../models/Users/_UsersMain.mjs';
@@ -648,5 +650,157 @@ router.patch('/initials/:id', async (req, res) => {
     }
 });
 
+// ============================================
+// REFUND MANAGEMENT (Manager Only)
+// ============================================
+
+// Set process status to REFUND-APPR (Refund Approved)
+router.patch('/processes/:processId/refund-approve', async (req, res) => {
+    try {
+        const { processId } = req.params;
+        const { notes } = req.body;
+
+        const process = await Process.findById(processId);
+        if (!process) {
+            return sendResponse(res, false, null, { status: 404, message: 'Process not found', code: 'NOT_FOUND' });
+        }
+
+        if (process.status !== 'REFUND-PEND') {
+            return sendResponse(res, false, null, { status: 400, message: 'Process must be in REFUND-PEND status', code: 'INVALID_STATUS' });
+        }
+
+        process.status = 'REFUND-APPR';
+        if (notes) process.reason = notes;
+        await process.save();
+
+        return sendResponse(res, true, process);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: error.message, code: 'UPDATE_ERROR' });
+    }
+});
+
+// Set process status to REFUND-REJC (Refund Rejected)
+router.patch('/processes/:processId/refund-reject', async (req, res) => {
+    try {
+        const { processId } = req.params;
+        const { notes } = req.body;
+
+        if (!notes || notes.trim().length === 0) {
+            return sendResponse(res, false, null, { status: 400, message: 'Rejection reason is required', code: 'REASON_REQUIRED' });
+        }
+
+        const process = await Process.findById(processId);
+        if (!process) {
+            return sendResponse(res, false, null, { status: 404, message: 'Process not found', code: 'NOT_FOUND' });
+        }
+
+        if (process.status !== 'REFUND-PEND') {
+            return sendResponse(res, false, null, { status: 400, message: 'Process must be in REFUND-PEND status', code: 'INVALID_STATUS' });
+        }
+
+        process.status = 'REFUND-REJC';
+        process.reason = notes.trim();
+        await process.save();
+
+        return sendResponse(res, true, process);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: error.message, code: 'UPDATE_ERROR' });
+    }
+});
+
+// Set process status to REFUND-COMP (Refund Completed)
+router.patch('/processes/:processId/refund-complete', async (req, res) => {
+    try {
+        const { processId } = req.params;
+        const { notes } = req.body;
+
+        const process = await Process.findById(processId);
+        if (!process) {
+            return sendResponse(res, false, null, { status: 404, message: 'Process not found', code: 'NOT_FOUND' });
+        }
+
+        if (process.status !== 'REFUND-APPR') {
+            return sendResponse(res, false, null, { status: 400, message: 'Process must be in REFUND-APPR status', code: 'INVALID_STATUS' });
+        }
+
+        process.status = 'REFUND-COMP';
+        if (notes) process.reason = notes;
+        await process.save();
+
+        return sendResponse(res, true, process);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: error.message, code: 'UPDATE_ERROR' });
+    }
+});
+
+/**
+ * PATCH /manager/processes/:processId/mark-verified
+ * Change DONE process status to VERIFIED
+ */
+router.patch('/processes/:processId/mark-verified', async (req, res) => {
+    try {
+        const { processId } = req.params;
+        const { notes } = req.body;
+
+        const process = await Process.findById(processId);
+        if (!process) {
+            return sendResponse(res, false, null, { status: 404, message: 'Process not found', code: 'NOT_FOUND' });
+        }
+
+        if (process.status !== PROCESS_STATUS.DONE) {
+            return sendResponse(res, false, null, { status: 400, message: 'Process must be in DONE status', code: 'INVALID_STATUS' });
+        }
+
+        process.status = PROCESS_STATUS.VERIFIED;
+        if (notes) process.notes = notes;
+        await process.save();
+
+        const populated = await Process.findById(processId)
+            .populate('studentId')
+            .populate('consultantId')
+            .populate('agentId')
+            .populate('universityId')
+            .populate('countryId');
+
+        return sendResponse(res, true, populated);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: error.message, code: 'UPDATE_ERROR' });
+    }
+});
+
+/**
+ * PATCH /manager/processes/:processId/mark-rejected
+ * Change DONE process status to REJECTED
+ */
+router.patch('/processes/:processId/mark-rejected', async (req, res) => {
+    try {
+        const { processId } = req.params;
+        const { notes } = req.body;
+
+        const process = await Process.findById(processId);
+        if (!process) {
+            return sendResponse(res, false, null, { status: 404, message: 'Process not found', code: 'NOT_FOUND' });
+        }
+
+        if (process.status !== PROCESS_STATUS.DONE) {
+            return sendResponse(res, false, null, { status: 400, message: 'Process must be in DONE status', code: 'INVALID_STATUS' });
+        }
+
+        process.status = PROCESS_STATUS.REJECTED;
+        if (notes) process.notes = notes;
+        await process.save();
+
+        const populated = await Process.findById(processId)
+            .populate('studentId')
+            .populate('consultantId')
+            .populate('agentId')
+            .populate('universityId')
+            .populate('countryId');
+
+        return sendResponse(res, true, populated);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: error.message, code: 'UPDATE_ERROR' });
+    }
+});
 
 export default router;

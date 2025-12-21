@@ -6,30 +6,15 @@ const { Schema, model } = mongoose;
 // ============================================
 // ENUMS
 // ============================================
-export const DOCUMENT_TYPE = Object.freeze({
-    PASSPORT: 'PASSPORT',
-    ACADEMIC_TRANSCRIPT: 'ACADEMIC_TRANSCRIPT',
-    DEGREE_CERTIFICATE: 'DEGREE_CERTIFICATE',
-    ENGLISH_TEST: 'ENGLISH_TEST',
-    RECOMMENDATION_LETTER: 'RECOMMENDATION_LETTER',
-    STATEMENT_OF_PURPOSE: 'STATEMENT_OF_PURPOSE',
-    CV_RESUME: 'CV_RESUME',
-    FINANCIAL_DOCUMENT: 'FINANCIAL_DOCUMENT',
-    VISA_FORM: 'VISA_FORM',
-    PHOTO: 'PHOTO',
-    OFFER_LETTER: 'OFFER_LETTER',
-    ADMISSION_LETTER: 'ADMISSION_LETTER',
-    VISA_APPROVAL: 'VISA_APPROVAL',
-    PAYMENT_RECEIPT: 'PAYMENT_RECEIPT',
-    OTHER: 'OTHER'
-});
 
 export const DOCUMENT_STATUS = Object.freeze({
     PENDING: 'PENDING',           // Requested but not uploaded
     UPLOADED: 'UPLOADED',         // Uploaded, awaiting verification
     VERIFIED: 'VERIFIED',         // Verified and accepted
     REJECTED: 'REJECTED',         // Rejected, needs re-upload
-    DECLINED: 'DECLINED'          // Declined due to process cancellation/refund
+
+    CANCELLED: 'CANCELLED',       // Declined due to process cancellation'
+    WITHDRAWN: 'WITHDRAWN'          // Declined due to process cancellation/refund
 });
 
 // ============================================
@@ -37,32 +22,29 @@ export const DOCUMENT_STATUS = Object.freeze({
 // ============================================
 const documentSchema = new Schema(
     {
-        taskId: {
+        processId: {
             type: Schema.Types.ObjectId,
-            ref: 'Task',
+            ref: 'Process',
             required: true,
             index: true
         },
+        // documentType is now a free-form string
         documentType: {
-            type: String,
-            enum: {
-                values: Object.values(DOCUMENT_TYPE),
-                message: 'Invalid document type: {VALUE}'
-            },
-            required: true,
-            index: true
-        },
-        name: {
             type: String,
             required: true,
             trim: true,
-            maxlength: [200, 'Document name cannot exceed 200 characters']
+            maxlength: [200, 'Document type cannot exceed 200 characters'],
+            index: true
         },
         description: {
             type: String,
             trim: true,
             maxlength: [500, 'Description cannot exceed 500 characters'],
             default: null
+        },
+        visibleToStudent: {
+            type: Boolean,
+            default: true
         },
         filePath: {
             type: String,
@@ -109,7 +91,7 @@ const documentSchema = new Schema(
 // ============================================
 // INDEXES
 // ============================================
-documentSchema.index({ taskId: 1, status: 1 });
+documentSchema.index({ processId: 1, status: 1 });
 
 // ============================================
 // VIRTUALS

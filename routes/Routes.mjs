@@ -17,11 +17,13 @@ import AdminRoutes from './Admin/AdminRoutes.mjs';
 const router = express.Router();
 
 
-import { requireFullAuth, requireConsultant, requireVisit, requireReceptionist, requireManager } from '../middlewares/Auth.mjs';
+import { requireFullAuth, requireConsultant, requireVisit, requireReceptionist, requireManager, requireAccountant, requireAgent } from '../middlewares/Auth.mjs';
 const requireRecept = [requireFullAuth, requireReceptionist];
 const managerAuth = [requireFullAuth, requireManager];
 const ConsulAuth = [requireFullAuth, requireConsultant];
 const VisitAuth = [requireFullAuth, requireVisit];
+const AccountantAuth = [requireFullAuth, requireAccountant];
+const AgentAuth = [requireFullAuth, requireAgent];
 
 const studyattach = function (req, res, next) { req.rtype = 'STUDY'; next(); }
 const visitattach = function (req, res, next) { req.rtype = 'VISIT'; next(); }
@@ -39,13 +41,17 @@ router.use('/checkAccess', CheckRoute);
 router.use('/student', StudentRoutes);
 
 router.use('/receptionist', requireRecept, receptionistRoutes);
-router.use('/accountant', accountantRoutes);
+router.use('/accountant', AccountantAuth, accountantRoutes);
 router.use('/consultant', ConsulAuth, studyattach, ConsultantRoutes);
 router.use('/visit', VisitAuth, visitattach, ConsultantRoutes);
-router.use('/agent', AgentRoutes);
+
+// Agent routes with study/visit separation
+router.use('/agent/study', AgentAuth, studyattach, AgentRoutes);
+router.use('/agent/visit', AgentAuth, visitattach, AgentRoutes);
 
 router.use('/manager/study', managerAuth, studyattach, ManagerRoutes);
 router.use('/manager/visit', managerAuth, visitattach, ManagerRoutes);
+
 router.use('/manager', managerAuth, ManagerRoutes);
 router.use('/admin', AdminRoutes);
 

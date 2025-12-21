@@ -55,6 +55,8 @@ const processSchema = new Schema({
     reason: { type: String, trim: true, maxlength: [500, 'Reason cannot exceed 500 characters'], default: null },
 }, { timestamps: true });
 
+
+
 // INDEXES
 processSchema.index({ studentId: 1, status: 1 });
 processSchema.index({ consultantId: 1, status: 1 });
@@ -69,7 +71,13 @@ processSchema.virtual('documents', { ref: 'Document', localField: '_id', foreign
 processSchema.virtual('tasks', { ref: 'Task', localField: '_id', foreignField: 'processId' });
 
 // INSTANCE METHODS
-
+// models/Process/Process.mjs
+processSchema.methods.updateStatus = function (newStatus, userId) {
+    if (!Object.values(PROCESS_STATUS).includes(newStatus)) throw { status: 400, message: 'Invalid status', code: 'ENUM_ERROR' };
+    this.statusHistory.push({ status: newStatus, changedBy: userId, changedAt: Date.now() });
+    this.status = newStatus;
+    return this.save();
+};
 
 // JSON TRANSFORM
 processSchema.set('toJSON', {

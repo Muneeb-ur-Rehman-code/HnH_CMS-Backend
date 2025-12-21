@@ -1,37 +1,33 @@
-// routes/student/student.mjs
+// routes/Student/Student.mjs
 import express from 'express';
-import User from '../../models/Users/_UsersMain.mjs';
 import StudentProfile from '../../models/Users/Student.mjs';
-import Initial from '../../models/initial/Initial.mjs';
-import Application from '../../models/Process/Process.mjs';
+import User, { USER_ROLE, USER_STATUS, USER_SOURCE } from '../../models/Users/_UsersMain.mjs';
+import Initial, { INITIAL_STATUS, INITIAL_TYPE } from '../../models/initial/Initial.mjs';
+import Process from '../../models/Process/Process.mjs';
 import { PROCESS_STATUS } from '../../config/enums.mjs';
-import Invoice from '../../models/Invoice/Invoice.mjs';
-import Task from '../../models/Task/Tasks.mjs';
-import Document from '../../models/Docx/Document.mjs';
-import Country from '../../models/Country/CountryModel.mjs';
-import University from '../../models/University/UniModel.mjs';
-import StaffProfile from '../../models/Users/StaffProfile.mjs';
+import Invoice, { INVOICE_STATUS, INVOICE_PAYMENT_TYPE } from '../../models/Invoice/Invoice.mjs';
+import Task, { TASK_STATUS } from '../../models/Task/Tasks.mjs';
+import Document, { DOCUMENT_STATUS } from '../../models/Docx/Document.mjs';
 import { attachUser, requireRole, requireOnboardingComplete } from '../../middlewares/Auth.mjs';
-import { USER_ROLE } from '../../models/Users/_UsersMain.mjs';
-import { INITIAL_SOURCE, INITIAL_STATUS, INITIAL_TYPE } from '../../models/initial/Initial.mjs';
-import mongoose from 'mongoose';
 
 const router = express.Router();
 
-// All routes require student role and completed onboarding
+// Middleware to ensure student is authenticated and onboarded
 const requireStudent = [
     attachUser,
     requireRole(USER_ROLE.STUDENT),
     requireOnboardingComplete
 ];
 
-// /api/student/profile
+// ==========================================
+// PROFILE ENDPOINTS
+// ==========================================
+
+// GET student profile
 router.get('/profile', requireStudent, async (req, res) => {
     try {
         const user = req.user;
-
-        // Get student profile if exists
-        const studentProfile = await StudentProfile.findOne({ userId: user._id }).select('-deletedAt -createdAt -updatedAt -isPassportExpired -isPassportExpiringSoon -hasCompleteAddress -isDeleted -id');
+        const studentProfile = await StudentProfile.findOne({ userId: user._id });
 
         return res.status(200).json({
             success: true,
@@ -41,21 +37,14 @@ router.get('/profile', requireStudent, async (req, res) => {
                     email: user.email,
                     firstName: user.firstName,
                     lastName: user.lastName,
-                    nationality: studentProfile?.nationality || null,
-                    passportNumber: studentProfile?.passportNumber || null,
-                    passportExpiry: studentProfile?.passportExpiry || null,
-                    address: studentProfile?.address || null,
-                    educationLevel: studentProfile?.educationLevel || null,
-                    currentInstitution: studentProfile?.currentInstitution || null,
-                    graduationYear: studentProfile?.graduationYear || null,
-                    lastGpa: studentProfile?.lastGpa || null,
-                    englishProficiency: studentProfile?.englishProficiency || null
+                    phone: user?.phone?.number || null,
+                    dob: user?.dob || null,
+                    gender: user?.gender || null
                 },
+                profile: studentProfile || {}
             }
         });
-
     } catch (error) {
-        console.error('Get profile error:', error);
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch profile',
@@ -64,7 +53,7 @@ router.get('/profile', requireStudent, async (req, res) => {
     }
 });
 
-// /api/student/profile
+// PUT update student profile
 router.put('/profile', requireStudent, async (req, res) => {
     try {
         const user = req.user;
@@ -80,11 +69,9 @@ router.put('/profile', requireStudent, async (req, res) => {
             englishProficiency
         } = req.body;
 
-
         let studentProfile = await StudentProfile.findOne({ userId: user._id });
-
         if (!studentProfile) {
-            studentProfile = new StudentProfile({ userId: user._id });
+            studentProfile = await StudentProfile.create({ userId: user._id });
         }
 
         if (nationality !== undefined) studentProfile.nationality = nationality;
@@ -95,294 +82,111 @@ router.put('/profile', requireStudent, async (req, res) => {
         if (graduationYear !== undefined) studentProfile.graduationYear = graduationYear;
         if (lastGpa !== undefined) studentProfile.lastGpa = lastGpa;
 
-
         if (address !== undefined) {
-            const addresser = {
-                street: address?.street || null,
-                city: address?.city || null,
-                state: address?.state || null,
-                country: address?.country || null,
-                postalCode: address?.postalCode || null
-            }
-            studentProfile.address = addresser;
+            studentProfile.address = {
+                ...studentProfile.address?.toObject?.() || {},
+                ...address
+            };
         }
 
         if (englishProficiency !== undefined) {
-            const englisher = {
-                testType: englishProficiency?.testType || null,
-                overallScore: englishProficiency?.overallScore || null,
-                testDate: englishProficiency?.testDate || null,
-            }
-            studentProfile.englishProficiency = englisher;
+            studentProfile.englishProficiency = {
+                ...studentProfile.englishProficiency?.toObject?.() || {},
+                ...englishProficiency
+            };
         }
+
         await studentProfile.save();
 
         return res.status(200).json({
             success: true,
             message: 'Profile updated successfully',
-            data: {
-                user: {
-                    id: user._id,
-                    email: user.email,
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    phoneNumber: user?.phone?.number || null,
-                    dateOfBirth: user?.dob || null,
-                    gender: user.gender
-                },
-                profile: studentProfile
-            }
+            data: studentProfile
         });
-
     } catch (error) {
-        console.error('Update profile error:', error);
-
-        if (error.name === 'ValidationError') {
-            const messages = Object.values(error.errors).map(err => err.message);
-            return res.status(400).json({
-                success: false,
-                message: messages.join(', ')
-            });
-        }
-
-        return res.status(500).json({
+        return res.status(error.name === 'ValidationError' ? 400 : 500).json({
             success: false,
-            message: 'Failed to update profile',
-            error: error.message
+            message: error.message
         });
     }
 });
 
+// ==========================================
+// INITIAL / LEAD ENDPOINTS
+// ==========================================
 
-
-
-// /api/student/initials
+// GET all initials for this student (any status)
 router.get('/initials', requireStudent, async (req, res) => {
     try {
         const user = req.user;
         const studentProfile = await StudentProfile.findOne({ userId: user._id });
-
         if (!studentProfile) {
-            return res.status(200).json({
-                success: true,
-                data: { count: 0, initials: [] }
-            });
+            return res.status(404).json({ success: false, message: 'Student profile not found' });
         }
 
-        const initials = await Initial.find({
-            studentId: studentProfile._id,
-            status: { $ne: INITIAL_STATUS.REFUSED }
-        })
-            .select('status type preferredCountry otherCountry preferredUniversity otherUniversity notes reviewedAt rejectionReason markedAt createdAt')
-            .sort({ createdAt: -1 });
-
+        const initials = await Initial.find({ studentId: studentProfile._id }).sort({ createdAt: -1 });
         return res.status(200).json({
             success: true,
-            data: {
-                count: initials.length,
-                initials: initials.map(initial => ({
-                    id: initial._id,
-                    status: initial.status,
-                    type: initial.type,
-                    preferredCountry: initial.preferredCountry,
-                    otherCountry: initial.otherCountry,
-                    preferredUniversity: initial.preferredUniversity,
-                    otherUniversity: initial.otherUniversity,
-                    notes: initial.notes,
-                    reviewedAt: initial.reviewedAt,
-                    rejectionReason: initial.rejectionReason,
-                    markedAt: initial.markedAt,
-                    createdAt: initial.createdAt
-                }))
-            }
+            count: initials.length,
+            data: initials
         });
-
     } catch (error) {
-        console.error('Get initials error:', error);
         return res.status(500).json({
             success: false,
-            message: 'Failed to fetch initials',
-            error: error.message
+            message: error.message
         });
     }
 });
 
-// /api/student/initials
+// POST create new initial
 router.post('/initials', requireStudent, async (req, res) => {
     try {
         const user = req.user;
-        const {
-            type = INITIAL_TYPE.STUDY,
-            notes,
-            preferredCountry,
-            otherCountry,
-            preferredUniversity,
-            otherUniversity
-        } = req.body;
+        const { type, preferredCountry, otherCountry, preferredUniversity, otherUniversity, notes } = req.body;
 
-        // Validation: Check user's onboarding status
-        const isEmailVerified = await user.isEmailVerifiedAsync();
-        const hasPassword = await user.hasPasswordAsync();
-        const isPhoneVerified = await user.isPhoneVerifiedAsync();
-
-        if (!isEmailVerified || !hasPassword || !isPhoneVerified) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please complete your profile verification (email, password, phone) before creating an initial application.'
-            });
+        if (!type || ![INITIAL_TYPE.STUDY, INITIAL_TYPE.VISIT].includes(type)) {
+            return res.status(400).json({ success: false, message: 'Valid type (STUDY or VISIT) is required' });
         }
 
         const studentProfile = await StudentProfile.findOne({ userId: user._id });
         if (!studentProfile) {
-            return res.status(400).json({
-                success: false,
-                message: "Student profile not found. Please complete your profile first."
-            });
+            return res.status(404).json({ success: false, message: 'Student profile not found' });
         }
 
-        /* Update now we can have multiple
-         Validation: Check for existing application
-         const existingInitial = await Initial.findOne({
-             studentId: studentProfile._id,
-             status: { $in: [INITIAL_STATUS.PENDING, INITIAL_STATUS.REJECTED, INITIAL_STATUS.APPROVED] }
-         });
-
-         if (existingInitial) {
-             return res.status(400).json({
-                 success: false,
-                 message: `You already have an application with '${existingInitial.status}' status. Please delete it first before creating a new one.`
-             });
-         } */
-
-
-        // Prepare initial data
-        const initialData = {
+        const initial = await Initial.create({
             studentId: studentProfile._id,
             type,
-            notes,
-            preferredCountry,
-            otherCountry,
-            preferredUniversity,
-            otherUniversity,
-            source: INITIAL_SOURCE.ONLINE,
-            status: INITIAL_STATUS.PENDING // Default to pending
-        };
-
-        // Auto-approve logic
-        let newStatus = INITIAL_STATUS.PENDING;
-        let consultantId = null;
-        // helper to support either ObjectId or 3-letter country code (e.g. 'CAN')
-        async function findCountryByIdOrCode(value) {
-            if (!value) return null;
-            // try ObjectId first
-            if (mongoose.Types.ObjectId.isValid(value)) {
-                try {
-                    const byId = await Country.findById(value);
-                    if (byId) return byId;
-                } catch (e) {
-                    // ignore cast errors and fall through to code lookup
-                }
-            }
-            // fallback to code lookup (Country.code is stored uppercase)
-            return await Country.findOne({ code: String(value).toUpperCase() });
-        }
-
-        if (type === INITIAL_TYPE.VISIT) {
-            if (preferredCountry && preferredCountry !== 'OTHER') {
-                const country = await findCountryByIdOrCode(preferredCountry);
-                if (country && country.consultantId) {
-                    const consultant = await StaffProfile.findById(country.consultantId);
-                    if (consultant && consultant.isVerified) {
-                        newStatus = INITIAL_STATUS.APPROVED;
-                        consultantId = consultant._id;
-                    }
-                }
-            }
-        } else if (type === INITIAL_TYPE.STUDY) {
-            if (preferredCountry && preferredCountry !== 'OTHER') {
-                newStatus = INITIAL_STATUS.APPROVED;
-                // Find a consultant for the country
-                const country = await findCountryByIdOrCode(preferredCountry);
-                if (country && country.consultantId) {
-                    const consultant = await StaffProfile.findById(country.consultantId);
-                    if (consultant && consultant.isVerified) {
-                        consultantId = consultant._id;
-                    } else {
-                        newStatus = INITIAL_STATUS.PENDING; // Downgrade if consultant not verified
-                    }
-                } else {
-                    newStatus = INITIAL_STATUS.PENDING; // No consultant for country
-                }
-            }
-        }
-
-        initialData.status = newStatus;
-        initialData.assignedConsultantId = consultantId;
-
-        const newInitial = new Initial(initialData);
-        await newInitial.save();
+            preferredCountry: preferredCountry || null,
+            otherCountry: otherCountry || null,
+            preferredUniversity: preferredUniversity || null,
+            otherUniversity: otherUniversity || null,
+            notes: notes || null,
+            status: INITIAL_STATUS.PENDING
+        });
 
         return res.status(201).json({
             success: true,
-            message: 'Initial application created successfully',
-            data: { initial: newInitial }
+            message: 'Initial created successfully',
+            data: initial
         });
-
     } catch (error) {
-        console.error('Create initial error:', error);
-        if (error.name === 'ValidationError') {
-            const messages = Object.values(error.errors).map(err => err.message);
-            return res.status(400).json({
-                success: false,
-                message: messages.join(', ')
-            });
-        }
-        return res.status(500).json({
+        return res.status(error.name === 'ValidationError' ? 400 : 500).json({
             success: false,
-            message: 'Failed to create initial application',
-            error: error.message
+            message: error.message
         });
     }
 });
 
-// DELETE /api/student/initials/:initialId
-router.delete('/initials/:initialId', requireStudent, async (req, res) => {
+// PUT set initial status to REFUSED (soft delete)
+router.put('/initials/:initialId/refuse', requireStudent, async (req, res) => {
     try {
-        const user = req.user;
         const { initialId } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(initialId)) {
-            return res.status(400).json({ success: false, message: 'Invalid Initial ID' });
-        }
-
+        const user = req.user;
         const studentProfile = await StudentProfile.findOne({ userId: user._id });
-        if (!studentProfile) {
-            // If no student profile, they can't have any initials to delete.
-            return res.status(404).json({
-                success: false,
-                message: 'Initial application not found'
-            });
-        }
 
-        const initial = await Initial.findOne({
-            _id: initialId,
-            studentId: studentProfile._id
-        });
-
+        const initial = await Initial.findOne({ _id: initialId, studentId: studentProfile._id });
         if (!initial) {
-            return res.status(404).json({
-                success: false,
-                message: 'Initial application not found'
-            });
-        }
-
-        // Check if deletable
-        const deletableStatuses = [INITIAL_STATUS.PENDING, INITIAL_STATUS.APPROVED, INITIAL_STATUS.REJECTED];
-        if (!deletableStatuses.includes(initial.status)) {
-            return res.status(400).json({
-                success: false,
-                message: `Cannot delete an application with status '${initial.status}'. Only applications in PENDING, APPROVED, or REJECTED state can be deleted.`
-            });
+            return res.status(404).json({ success: false, message: 'Initial not found' });
         }
 
         initial.status = INITIAL_STATUS.REFUSED;
@@ -390,398 +194,458 @@ router.delete('/initials/:initialId', requireStudent, async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: 'Initial application has been successfully refused.'
+            message: 'Initial marked as refused',
+            data: initial
         });
-
     } catch (error) {
-        console.error('Delete initial error:', error);
         return res.status(500).json({
             success: false,
-            message: 'Failed to delete initial application',
-            error: error.message
+            message: error.message
         });
     }
 });
 
-// /api/student/applications
+// ==========================================
+// PROCESS / APPLICATION ENDPOINTS
+// ==========================================
+
+// GET all processes/applications for this student
 router.get('/applications', requireStudent, async (req, res) => {
     try {
         const user = req.user;
+        const studentProfile = await StudentProfile.findOne({ userId: user._id });
+        if (!studentProfile) {
+            return res.status(404).json({ success: false, message: 'Student profile not found' });
+        }
 
-        const applications = await Application.find({
-            studentId: user._id,
-            deletedAt: null
-        })
-            .populate('consultantId', 'email firstName lastName phoneNumber')
-            .sort({ createdAt: -1 });
-
+        const processes = await Process.find({ studentId: studentProfile._id }).sort({ createdAt: -1 });
         return res.status(200).json({
             success: true,
-            data: {
-                count: applications.length,
-                applications: applications.map(app => ({
-                    id: app._id,
-                    targetCountry: app.targetCountry,
-                    targetUniversity: app.targetUniversity,
-                    targetCourse: app.targetCourse,
-                    intakePreference: app.intakePreference,
-                    status: app.status,
-                    consultant: app.consultantId ? {
-                        name: `${app.consultantId.firstName} ${app.consultantId.lastName}`,
-                        email: app.consultantId.email,
-                        phone: app.consultantId.phoneNumber
-                    } : null,
-                    createdAt: app.createdAt,
-                    updatedAt: app.updatedAt
-                }))
-            }
+            count: processes.length,
+            data: processes
         });
-
     } catch (error) {
-        console.error('Get applications error:', error);
         return res.status(500).json({
             success: false,
-            message: 'Failed to fetch applications',
-            error: error.message
+            message: error.message
         });
     }
 });
 
-// /api/student/applications/:applicationId
+// GET process/application by ID
 router.get('/applications/:applicationId', requireStudent, async (req, res) => {
     try {
-        const user = req.user;
         const { applicationId } = req.params;
+        const user = req.user;
+        const studentProfile = await StudentProfile.findOne({ userId: user._id });
 
-        const application = await Application.findOne({
-            _id: applicationId,
-            studentId: user._id,
-            deletedAt: null
-        })
-            .populate('consultantId', 'email firstName lastName phoneNumber')
-            .populate('initial');
+        const process = await Process.findOne({ _id: applicationId, studentId: studentProfile._id })
+            .populate('consultantId', 'firstName lastName')
+            .populate('agentId', 'firstName lastName');
 
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
+        if (!process) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
         }
-
-        // Include related invoices for the application
-        const invoices = await Invoice.find({ applicationId: application._id, deletedAt: null }).sort({ issuedAt: -1 });
 
         return res.status(200).json({
             success: true,
-            data: {
-                application: {
-                    id: application._id,
-                    targetCountry: application.targetCountry,
-                    targetUniversity: application.targetUniversity,
-                    targetCourse: application.targetCourse,
-                    intakePreference: application.intakePreference,
-                    budget: application.budget,
-                    status: application.status,
-                    statusHistory: application.statusHistory,
-                    consultant: application.consultantId ? {
-                        name: `${application.consultantId.firstName} ${application.consultantId.lastName}`,
-                        email: application.consultantId.email,
-                        phone: application.consultantId.phoneNumber
-                    } : null,
-                    initial: application.initial || null,
-                    invoices: invoices.map(inv => ({
-                        id: inv._id,
-                        invoiceNumber: inv.invoiceNumber,
-                        amount: inv.amount,
-                        currency: inv.currency,
-                        paymentType: inv.paymentType,
-                        status: inv.status,
-                        breakdown: inv.breakdown,
-                        dueDate: inv.dueDate,
-                        issuedAt: inv.issuedAt,
-                        approvedAt: inv.approvedAt
-                    })),
-                    createdAt: application.createdAt,
-                    updatedAt: application.updatedAt
-                }
-            }
+            data: process
         });
-
     } catch (error) {
-        console.error('Get application error:', error);
         return res.status(500).json({
             success: false,
-            message: 'Failed to fetch application',
-            error: error.message
+            message: error.message
         });
     }
 });
 
-// /api/student/applications/:applicationId/invoices
-router.get('/applications/:applicationId/invoices', requireStudent, async (req, res) => {
-    try {
-        const user = req.user;
-        const { applicationId } = req.params;
+// ==========================================
+// TASK ENDPOINTS
+// ==========================================
 
-        // Verify application belongs to student
-        const application = await Application.findOne({
-            _id: applicationId,
-            studentId: user._id,
-            deletedAt: null
-        });
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
-        }
-
-        const invoices = await Invoice.find({
-            applicationId,
-            deletedAt: null
-        }).sort({ issuedAt: -1 });
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                count: invoices.length,
-                invoices: invoices.map(inv => ({
-                    id: inv._id,
-                    invoiceNumber: inv.invoiceNumber,
-                    amount: inv.amount,
-                    currency: inv.currency,
-                    paymentType: inv.paymentType,
-                    status: inv.status,
-                    breakdown: inv.breakdown,
-                    dueDate: inv.dueDate,
-                    issuedAt: inv.issuedAt,
-                    approvedAt: inv.approvedAt
-                }))
-            }
-        });
-
-    } catch (error) {
-        console.error('Get invoices error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to fetch invoices',
-            error: error.message
-        });
-    }
-});
-
-// /api/student/applications/:applicationId/tasks
+// GET all tasks for a process (only visible to student)
 router.get('/applications/:applicationId/tasks', requireStudent, async (req, res) => {
     try {
-        const user = req.user;
         const { applicationId } = req.params;
+        const user = req.user;
+        const studentProfile = await StudentProfile.findOne({ userId: user._id });
 
-        // Verify application belongs to student
-        const application = await Application.findOne({
-            _id: applicationId,
-            studentId: user._id,
-            deletedAt: null
-        });
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
+        const process = await Process.findOne({ _id: applicationId, studentId: studentProfile._id });
+        if (!process) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
         }
 
-        const tasks = await Task.find({
-            applicationId,
-            visibleToStudent: true,
-            deletedAt: null
-        })
-            .populate('createdBy', 'firstName lastName')
-            .sort({ dueDate: 1, createdAt: -1 });
-
+        // Only show tasks that are visibleToStudent
+        const tasks = await Task.find({ processId: applicationId, visibleToStudent: true }).sort({ createdAt: -1 });
         return res.status(200).json({
             success: true,
-            data: {
-                count: tasks.length,
-                tasks: tasks.map(task => ({
-                    id: task._id,
-                    title: task.title,
-                    description: task.description,
-                    status: task.status,
-                    priority: task.priority,
-                    dueDate: task.dueDate,
-                    completedAt: task.completedAt,
-                    createdBy: task.createdBy ? `${task.createdBy.firstName} ${task.createdBy.lastName}` : null,
-                    createdAt: task.createdAt
-                }))
-            }
+            count: tasks.length,
+            data: tasks
         });
-
     } catch (error) {
-        console.error('Get tasks error:', error);
         return res.status(500).json({
             success: false,
-            message: 'Failed to fetch tasks',
-            error: error.message
+            message: error.message
         });
     }
 });
 
-// /api/student/applications/:applicationId/documents
+// ==========================================
+// DOCUMENT ENDPOINTS
+// ==========================================
+
+// GET all documents for a process (only visible to student)
 router.get('/applications/:applicationId/documents', requireStudent, async (req, res) => {
     try {
-        const user = req.user;
         const { applicationId } = req.params;
+        const user = req.user;
+        const studentProfile = await StudentProfile.findOne({ userId: user._id });
 
-        // Verify application belongs to student
-        const application = await Application.findOne({
-            _id: applicationId,
-            studentId: user._id,
-            deletedAt: null
+        const process = await Process.findOne({ _id: applicationId, studentId: studentProfile._id });
+        if (!process) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        // Only show documents that are visibleToStudent
+        const documents = await Document.find({ processId: applicationId, visibleToStudent: true }).sort({ createdAt: -1 });
+        return res.status(200).json({
+            success: true,
+            count: documents.length,
+            data: documents
         });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
 
-        if (!application) {
-            return res.status(404).json({
+// POST upload document (only if status is PENDING or UPLOADED)
+router.post('/applications/:applicationId/documents/:documentId/upload', requireStudent, async (req, res) => {
+    try {
+        const { applicationId, documentId } = req.params;
+        const { filePath } = req.body;
+        const user = req.user;
+        const studentProfile = await StudentProfile.findOne({ userId: user._id });
+
+        if (!filePath) {
+            return res.status(400).json({ success: false, message: 'File path is required' });
+        }
+
+        const process = await Process.findOne({ _id: applicationId, studentId: studentProfile._id });
+        if (!process) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        const doc = await Document.findOne({ _id: documentId, processId: applicationId });
+        if (!doc) {
+            return res.status(404).json({ success: false, message: 'Document not found' });
+        }
+
+        if (doc.status !== DOCUMENT_STATUS.PENDING && doc.status !== DOCUMENT_STATUS.UPLOADED) {
+            return res.status(400).json({
                 success: false,
-                message: 'Application not found'
+                message: 'Can only upload to documents with PENDING or UPLOADED status'
             });
         }
 
-        const documents = await Document.find({
-            applicationId,
-            visibleToStudent: true,
-            deletedAt: null
+        // Use the upload method to handle state changes
+        await doc.upload(user._id, filePath);
+        return res.status(200).json({
+            success: true,
+            message: 'Document uploaded successfully',
+            data: doc
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// ==========================================
+// INVOICE ENDPOINTS
+// ==========================================
+
+// GET invoices for application (only DIRECT payment type)
+router.get('/applications/:applicationId/invoices', requireStudent, async (req, res) => {
+    try {
+        const { applicationId } = req.params;
+        const user = req.user;
+        const studentProfile = await StudentProfile.findOne({ userId: user._id });
+
+        const process = await Process.findOne({ _id: applicationId, studentId: studentProfile._id });
+        if (!process) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        // Only show DIRECT payment type invoices
+        const invoices = await Invoice.find({
+            processId: applicationId,
+            paymentType: INVOICE_PAYMENT_TYPE.DIRECT
         }).sort({ createdAt: -1 });
 
         return res.status(200).json({
             success: true,
-            data: {
-                count: documents.length,
-                documents: documents.map(doc => ({
-                    id: doc._id,
-                    documentType: doc.documentType,
-                    name: doc.name,
-                    description: doc.description,
-                    status: doc.status,
-                    filePath: doc.filePath,
-                    fileName: doc.fileName,
-                    rejectionReason: doc.rejectionReason,
-                    expiryDate: doc.expiryDate,
-                    uploadedAt: doc.uploadedAt,
-                    verifiedAt: doc.verifiedAt
-                }))
-            }
+            count: invoices.length,
+            data: invoices
         });
-
     } catch (error) {
-        console.error('Get documents error:', error);
         return res.status(500).json({
             success: false,
-            message: 'Failed to fetch documents',
-            error: error.message
+            message: error.message
         });
     }
 });
 
-// POST /api/student/applications/:applicationId/documents/:documentId/upload
-router.post('/applications/:applicationId/documents/:documentId/upload', requireStudent, async (req, res) => {
+// POST upload invoice payment screenshot (append to paymentTracking array)
+router.post('/applications/:applicationId/invoices/:invoiceId/upload-payment', requireStudent, async (req, res) => {
     try {
+        const { applicationId, invoiceId } = req.params;
+        const { paymentMethod, transactionId, filePath } = req.body;
         const user = req.user;
-        const { applicationId, documentId } = req.params;
+        const studentProfile = await StudentProfile.findOne({ userId: user._id });
 
-        // Verify application belongs to student
-        const application = await Application.findOne({
-            _id: applicationId,
-            studentId: user._id,
-            deletedAt: null
-        });
-
-        if (!application) {
-            return res.status(404).json({
-                success: false,
-                message: 'Application not found'
-            });
-        }
-
-        // Find document
-        const document = await Document.findOne({
-            _id: documentId,
-            applicationId,
-            visibleToStudent: true,
-            deletedAt: null
-        });
-
-        if (!document) {
-            return res.status(404).json({
-                success: false,
-                message: 'Document not found'
-            });
-        }
-
-        if (!req.fileInfo) {
+        if (!paymentMethod || !filePath) {
             return res.status(400).json({
                 success: false,
-                message: 'No file uploaded'
+                message: 'Payment method and file path are required'
             });
         }
 
-        await document.upload(user._id, {
-            filePath: req.fileInfo.path,
-            fileName: req.fileInfo.name,
-            fileSize: req.fileInfo.size,
-            mimeType: req.fileInfo.mimeType
+        const process = await Process.findOne({ _id: applicationId, studentId: studentProfile._id });
+        if (!process) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        const invoice = await Invoice.findOne({ _id: invoiceId, processId: applicationId, paymentType: INVOICE_PAYMENT_TYPE.DIRECT });
+        if (!invoice) {
+            return res.status(404).json({ success: false, message: 'Invoice not found' });
+        }
+
+        // Append to paymentTracking array
+        invoice.paymentTracking.push({
+            paymentMethod,
+            transactionId: transactionId || null,
+            filePath,
+            recordedBy: user._id,
+            recordedAt: new Date(),
+            status: 'PENDING'
+        });
+
+        // Change invoice status to PAYMENT_RECEIVED if not already
+        if (invoice.status === INVOICE_STATUS.PENDING) {
+            invoice.status = INVOICE_STATUS.PAYMENT_RECEIVED;
+        }
+
+        await invoice.save();
+        return res.status(200).json({
+            success: true,
+            message: 'Payment uploaded successfully',
+            data: invoice
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// ==========================================
+// PROCESS SUMMARY ENDPOINTS
+// ==========================================
+
+// GET process summary (document, task, invoice counts by status)
+router.get('/applications/:applicationId/summary', requireStudent, async (req, res) => {
+    try {
+        const { applicationId } = req.params;
+        const user = req.user;
+        const studentProfile = await StudentProfile.findOne({ userId: user._id });
+
+        const process = await Process.findOne({ _id: applicationId, studentId: studentProfile._id });
+        if (!process) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        // Get visible documents
+        const documents = await Document.find({ processId: applicationId, visibleToStudent: true });
+        const docCountByStatus = {};
+        documents.forEach(doc => {
+            docCountByStatus[doc.status] = (docCountByStatus[doc.status] || 0) + 1;
+        });
+
+        // Get visible tasks
+        const tasks = await Task.find({ processId: applicationId, visibleToStudent: true });
+        const taskCountByStatus = {};
+        tasks.forEach(task => {
+            taskCountByStatus[task.status] = (taskCountByStatus[task.status] || 0) + 1;
+        });
+
+        // Get DIRECT payment invoices
+        const invoices = await Invoice.find({ processId: applicationId, paymentType: INVOICE_PAYMENT_TYPE.DIRECT });
+        const invoiceCountByStatus = {};
+        invoices.forEach(inv => {
+            invoiceCountByStatus[inv.status] = (invoiceCountByStatus[inv.status] || 0) + 1;
         });
 
         return res.status(200).json({
             success: true,
-            message: 'Document uploaded successfully',
-            data: { document }
+            data: {
+                processId: applicationId,
+                status: process.status,
+                documents: {
+                    total: documents.length,
+                    byStatus: docCountByStatus
+                },
+                tasks: {
+                    total: tasks.length,
+                    byStatus: taskCountByStatus
+                },
+                invoices: {
+                    total: invoices.length,
+                    byStatus: invoiceCountByStatus
+                }
+            }
         });
-
     } catch (error) {
-        console.error('Upload document error:', error);
         return res.status(500).json({
             success: false,
-            message: 'Failed to upload document',
-            error: error.message
+            message: error.message
         });
     }
 });
 
-// Application-specific actions merged from legacy "processes" routes
+// GET all processes summary
+router.get('/applications-summary', requireStudent, async (req, res) => {
+    try {
+        const user = req.user;
+        const studentProfile = await StudentProfile.findOne({ userId: user._id });
+        if (!studentProfile) {
+            return res.status(404).json({ success: false, message: 'Student profile not found' });
+        }
+
+        const processes = await Process.find({ studentId: studentProfile._id });
+        const summaries = [];
+
+        for (const process of processes) {
+            const documents = await Document.find({ processId: process._id, visibleToStudent: true });
+            const docCountByStatus = {};
+            documents.forEach(doc => {
+                docCountByStatus[doc.status] = (docCountByStatus[doc.status] || 0) + 1;
+            });
+
+            const tasks = await Task.find({ processId: process._id, visibleToStudent: true });
+            const taskCountByStatus = {};
+            tasks.forEach(task => {
+                taskCountByStatus[task.status] = (taskCountByStatus[task.status] || 0) + 1;
+            });
+
+            const invoices = await Invoice.find({ processId: process._id, paymentType: INVOICE_PAYMENT_TYPE.DIRECT });
+            const invoiceCountByStatus = {};
+            invoices.forEach(inv => {
+                invoiceCountByStatus[inv.status] = (invoiceCountByStatus[inv.status] || 0) + 1;
+            });
+
+            summaries.push({
+                processId: process._id,
+                status: process.status,
+                documents: {
+                    total: documents.length,
+                    byStatus: docCountByStatus
+                },
+                tasks: {
+                    total: tasks.length,
+                    byStatus: taskCountByStatus
+                },
+                invoices: {
+                    total: invoices.length,
+                    byStatus: invoiceCountByStatus
+                }
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            count: summaries.length,
+            data: summaries
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// ==========================================
+// PROCESS CANCELLATION
+// ==========================================
+
+// PATCH cancel process (complex logic based on invoice status)
 router.patch('/applications/:applicationId/cancel', requireStudent, async (req, res) => {
     try {
         const { applicationId } = req.params;
-        const { reason } = req.body;
-        const studentProfile = await StudentProfile.findOne({ userId: req.user._id });
-        const application = await Application.findOne({ _id: applicationId, studentId: studentProfile._id });
-        if (!application) {
-            return res.status(404).json({ success: false, message: 'Application not found.' });
-        }
-        await application.updateStatus(PROCESS_STATUS.CANCELLED, req.user, reason);
-        res.status(200).json({ success: true, message: 'Application cancelled successfully.' });
-    } catch (error) {
-        res.status(400).json({ success: false, message: error.message });
-    }
-});
+        const user = req.user;
+        const studentProfile = await StudentProfile.findOne({ userId: user._id });
 
-// Invoice payment endpoint (ownership check uses application reference)
-router.post('/invoices/:invoiceId/pay', requireStudent, async (req, res) => {
-    try {
-        const { invoiceId } = req.params;
-        const studentProfile = await StudentProfile.findOne({ userId: req.user._id });
-        const invoice = await Invoice.findOne({ _id: invoiceId }).populate('applicationId');
-
-        if (!invoice || !invoice.applicationId || invoice.applicationId.studentId.toString() !== studentProfile._id.toString()) {
-            return res.status(404).json({ success: false, message: 'Invoice not found.' });
+        const process = await Process.findOne({ _id: applicationId, studentId: studentProfile._id });
+        if (!process) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
         }
 
-        await invoice.recordPayment(req.user, req.body);
-        res.status(200).json({ success: true, message: 'Payment submitted for review.', data: invoice });
+        // Get all invoices for this process
+        const invoices = await Invoice.find({ processId: applicationId });
+
+        let newProcessStatus = PROCESS_STATUS.WITHDRAWN;
+
+        // Check if any invoice has payment received or approved
+        const hasPaymentReceived = invoices.some(inv => inv.status === INVOICE_STATUS.PAYMENT_RECEIVED);
+        const hasApproved = invoices.some(inv => inv.status === INVOICE_STATUS.APPROVED);
+
+        if (hasPaymentReceived || hasApproved) {
+            newProcessStatus = 'REFUND-PEND';
+        }
+
+        process.status = newProcessStatus;
+        await process.save();
+
+        // Update tasks: set non-completed/cancelled tasks to WITHDRAWN
+        const tasksToUpdate = await Task.find({
+            processId: applicationId,
+            status: { $nin: [TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED] }
+        });
+        for (const task of tasksToUpdate) {
+            task.status = TASK_STATUS.WITHDRAWN;
+            await task.save();
+        }
+
+        // Update documents: set non-verified/rejected/cancelled docs to WITHDRAWN
+        const docsToUpdate = await Document.find({
+            processId: applicationId,
+            status: { $nin: [DOCUMENT_STATUS.VERIFIED, DOCUMENT_STATUS.REJECTED, DOCUMENT_STATUS.CANCELLED] }
+        });
+        for (const doc of docsToUpdate) {
+            doc.status = DOCUMENT_STATUS.WITHDRAWN;
+            await doc.save();
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Application cancelled successfully',
+            data: {
+                processId: applicationId,
+                newStatus: newProcessStatus
+            }
+        });
     } catch (error) {
-        res.status(400).json({ success: false, message: error.message });
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
     }
 });
-
 
 export default router;

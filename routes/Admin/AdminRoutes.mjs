@@ -1,16 +1,15 @@
 // routes/Admin/AdminRoutes.mjs
 import express from 'express';
-import mongoose from 'mongoose';
 import { attachUser, requireRole } from '../../middlewares/Auth.mjs';
 import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
 import StaffProfile, { STAFF_VERIFICATION_STATUS } from '../../models/Users/StaffProfile.mjs';
-import User from '../../models/Users/_UsersMain.mjs';
 import Invoice, { INVOICE_STATUS } from '../../models/Invoice/Invoice.mjs';
 import Process from '../../models/Process/Process.mjs';
 import { PROCESS_STATUS } from '../../config/enums.mjs';
 import Task, { TASK_STATUS } from '../../models/Task/Tasks.mjs';
-import Document from '../../models/Docx/Document.mjs';
-import Initial, { INITIAL_STATUS } from '../../models/initial/Initial.mjs';
+import Document, { DOCUMENT_STATUS } from '../../models/Docx/Document.mjs';
+import University from '../../models/University/UniModel.mjs';
+import Country from '../../models/Country/CountryModel.mjs';
 
 const router = express.Router();
 
@@ -19,390 +18,19 @@ const requireAdmin = [
     requireRole(STAFF_ROLE.ADMIN),
 ];
 
-// ============================================
-// RESPONSE HELPERS
-// ============================================
-
 const sendResponse = (res, success, data, error) => {
     if (success) {
         if (Array.isArray(data)) {
             return res.status(200).json({ success: true, count: data.length, data });
-        } else {
-            return res.status(200).json({ success: true, data });
         }
-    } else {
-        return res.status(error?.status || 500).json({
-            success: false,
-            message: error?.message || 'Server error',
-            code: error?.code || 'SERVER_ERROR'
-        });
+        return res.status(200).json({ success: true, data });
     }
+    return res.status(error?.status || 500).json({
+        success: false,
+        message: error?.message || 'Server error',
+        code: error?.code || 'SERVER_ERROR'
+    });
 };
-
-// ============================================
-// STAFF METRICS - ACCOUNTANT
-// ============================================
-
-/**
- * Get accountant performance metrics
- * Returns: total assigned, pending, done/approved, rejected, cancelled
- */
-const getAccountantMetrics = async (accountantId) => {
-    try {
-        const invoices = await Invoice.find({ accountantId });
-
-        const metrics = {
-            role: STAFF_ROLE.ACCOUNTANT,
-            totalAssigned: invoices.length,
-            byStatus: {
-                [INVOICE_STATUS.PENDING]: invoices.filter(i => i.status === INVOICE_STATUS.PENDING).length,
-                [INVOICE_STATUS.STUDENT_CONTACTED]: invoices.filter(i => i.status === INVOICE_STATUS.STUDENT_CONTACTED).length,
-                pending_progress: invoices.filter(i => [INVOICE_STATUS.PENDING, INVOICE_STATUS.STUDENT_CONTACTED].includes(i.status)).length,
-                [INVOICE_STATUS.PAYMENT_RECEIVED]: invoices.filter(i => i.status === INVOICE_STATUS.PAYMENT_RECEIVED).length,
-                [INVOICE_STATUS.APPROVED]: invoices.filter(i => i.status === INVOICE_STATUS.APPROVED).length,
-                done_approved: invoices.filter(i => i.status === INVOICE_STATUS.APPROVED).length,
-                [INVOICE_STATUS.REJECTED]: invoices.filter(i => i.status === INVOICE_STATUS.REJECTED).length,
-                [INVOICE_STATUS.CANCELLED]: invoices.filter(i => i.status === INVOICE_STATUS.CANCELLED).length,
-            },
-            invoices: invoices
-        };
-
-        return metrics;
-    } catch (error) {
-        throw error;
-    }
-};
-
-// ============================================
-// STAFF METRICS - CONSULTANT
-// ============================================
-
-/**
- * Get consultant performance metrics
- * Returns: total processes, tasks, documents, and their statuses
- */
-const getConsultantMetrics = async (consultantId) => {
-    try {
-        const processes = await Process.find({ consultantId });
-        const tasks = await Task.find({
-            processId: { $in: processes.map(p => p._id) },
-            createdBy: consultantId
-        });
-        const documents = await Document.find({
-            processId: { $in: processes.map(p => p._id) }
-        });
-        const initials = await Initial.find({ assignedConsultantId: consultantId });
-
-        const metrics = {
-            role: STAFF_ROLE.CONSULTANT,
-            totalInitials: initials.length,
-            initialsByStatus: {
-                [INITIAL_STATUS.APPROVED]: initials.filter(i => i.status === INITIAL_STATUS.APPROVED).length,
-                [INITIAL_STATUS.PENDING]: initials.filter(i => i.status === INITIAL_STATUS.PENDING).length,
-                [INITIAL_STATUS.REJECTED]: initials.filter(i => i.status === INITIAL_STATUS.REJECTED).length,
-                [INITIAL_STATUS.DECLINED]: initials.filter(i => i.status === INITIAL_STATUS.DECLINED).length,
-                [INITIAL_STATUS.DONE]: initials.filter(i => i.status === INITIAL_STATUS.DONE).length,
-            },
-            totalProcesses: processes.length,
-            processesByStatus: {
-                [PROCESS_STATUS.GATHERING_INFO]: processes.filter(p => p.status === PROCESS_STATUS.GATHERING_INFO).length,
-                [PROCESS_STATUS.INFO_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.INFO_COMPLETE).length,
-                [PROCESS_STATUS.INVOICE_PENDING]: processes.filter(p => p.status === PROCESS_STATUS.INVOICE_PENDING).length,
-                [PROCESS_STATUS.INVOICE_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.INVOICE_COMPLETE).length,
-                [PROCESS_STATUS.DOCUMENTS_PENDING]: processes.filter(p => p.status === PROCESS_STATUS.DOCUMENTS_PENDING).length,
-                [PROCESS_STATUS.DOCUMENTS_PROCESSING]: processes.filter(p => p.status === PROCESS_STATUS.DOCUMENTS_PROCESSING).length,
-                [PROCESS_STATUS.DOCUMENTS_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.DOCUMENTS_COMPLETE).length,
-                [PROCESS_STATUS.ADMISSION_PENDING]: processes.filter(p => p.status === PROCESS_STATUS.ADMISSION_PENDING).length,
-                [PROCESS_STATUS.ADMISSION_PROCESSING]: processes.filter(p => p.status === PROCESS_STATUS.ADMISSION_PROCESSING).length,
-                [PROCESS_STATUS.ADMISSION_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.ADMISSION_COMPLETE).length,
-                [PROCESS_STATUS.VISA_PENDING]: processes.filter(p => p.status === PROCESS_STATUS.VISA_PENDING).length,
-                [PROCESS_STATUS.VISA_PROCESSING]: processes.filter(p => p.status === PROCESS_STATUS.VISA_PROCESSING).length,
-                [PROCESS_STATUS.VISA_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.VISA_COMPLETE).length,
-                [PROCESS_STATUS.SUBMITTED]: processes.filter(p => p.status === PROCESS_STATUS.SUBMITTED).length,
-                [PROCESS_STATUS.DONE]: processes.filter(p => p.status === PROCESS_STATUS.DONE).length,
-                [PROCESS_STATUS.REJECTED]: processes.filter(p => p.status === PROCESS_STATUS.REJECTED).length,
-                [PROCESS_STATUS.CANCELLED]: processes.filter(p => p.status === PROCESS_STATUS.CANCELLED).length,
-            },
-            totalTasks: tasks.length,
-            tasksByStatus: {
-                [TASK_STATUS.PENDING]: tasks.filter(t => t.status === TASK_STATUS.PENDING).length,
-                [TASK_STATUS.IN_PROGRESS]: tasks.filter(t => t.status === TASK_STATUS.IN_PROGRESS).length,
-                [TASK_STATUS.COMPLETED]: tasks.filter(t => t.status === TASK_STATUS.COMPLETED).length,
-                [TASK_STATUS.CANCELLED]: tasks.filter(t => t.status === TASK_STATUS.CANCELLED).length,
-                [TASK_STATUS.DECLINED]: tasks.filter(t => t.status === TASK_STATUS.DECLINED).length,
-            },
-            totalDocuments: documents.length,
-            processes: processes,
-            tasks: tasks,
-            documents: documents
-        };
-
-        return metrics;
-    } catch (error) {
-        throw error;
-    }
-};
-
-// ============================================
-// STAFF METRICS - AGENT
-// ============================================
-
-/**
- * Get agent performance metrics
- * Returns: assigned processes and tasks
- */
-const getAgentMetrics = async (agentId) => {
-    try {
-        const processes = await Process.find({ agentId });
-        const tasks = await Task.find({
-            processId: { $in: processes.map(p => p._id) }
-        });
-
-        const metrics = {
-            role: STAFF_ROLE.AGENT,
-            totalProcesses: processes.length,
-            processesByStatus: {
-                [PROCESS_STATUS.ADMISSION_PENDING]: processes.filter(p => p.status === PROCESS_STATUS.ADMISSION_PENDING).length,
-                [PROCESS_STATUS.ADMISSION_PROCESSING]: processes.filter(p => p.status === PROCESS_STATUS.ADMISSION_PROCESSING).length,
-                [PROCESS_STATUS.ADMISSION_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.ADMISSION_COMPLETE).length,
-                [PROCESS_STATUS.VISA_PENDING]: processes.filter(p => p.status === PROCESS_STATUS.VISA_PENDING).length,
-                [PROCESS_STATUS.VISA_PROCESSING]: processes.filter(p => p.status === PROCESS_STATUS.VISA_PROCESSING).length,
-                [PROCESS_STATUS.VISA_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.VISA_COMPLETE).length,
-                [PROCESS_STATUS.SUBMITTED]: processes.filter(p => p.status === PROCESS_STATUS.SUBMITTED).length,
-                [PROCESS_STATUS.DONE]: processes.filter(p => p.status === PROCESS_STATUS.DONE).length,
-                [PROCESS_STATUS.REJECTED]: processes.filter(p => p.status === PROCESS_STATUS.REJECTED).length,
-                [PROCESS_STATUS.CANCELLED]: processes.filter(p => p.status === PROCESS_STATUS.CANCELLED).length,
-            },
-            totalTasks: tasks.length,
-            tasksByStatus: {
-                [TASK_STATUS.PENDING]: tasks.filter(t => t.status === TASK_STATUS.PENDING).length,
-                [TASK_STATUS.IN_PROGRESS]: tasks.filter(t => t.status === TASK_STATUS.IN_PROGRESS).length,
-                [TASK_STATUS.COMPLETED]: tasks.filter(t => t.status === TASK_STATUS.COMPLETED).length,
-                [TASK_STATUS.CANCELLED]: tasks.filter(t => t.status === TASK_STATUS.CANCELLED).length,
-                [TASK_STATUS.DECLINED]: tasks.filter(t => t.status === TASK_STATUS.DECLINED).length,
-            },
-            processes: processes,
-            tasks: tasks
-        };
-
-        return metrics;
-    } catch (error) {
-        throw error;
-    }
-};
-
-// ============================================
-// STAFF METRICS - MANAGER
-// ============================================
-
-/**
- * Get manager overview metrics
- */
-const getManagerMetrics = async (managerId) => {
-    try {
-        const processes = await Process.find({});
-
-        const metrics = {
-            role: STAFF_ROLE.MANAGER,
-            totalProcesses: processes.length,
-            processesByStatus: {
-                [PROCESS_STATUS.GATHERING_INFO]: processes.filter(p => p.status === PROCESS_STATUS.GATHERING_INFO).length,
-                [PROCESS_STATUS.INFO_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.INFO_COMPLETE).length,
-                [PROCESS_STATUS.INVOICE_PENDING]: processes.filter(p => p.status === PROCESS_STATUS.INVOICE_PENDING).length,
-                [PROCESS_STATUS.INVOICE_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.INVOICE_COMPLETE).length,
-                [PROCESS_STATUS.DOCUMENTS_PENDING]: processes.filter(p => p.status === PROCESS_STATUS.DOCUMENTS_PENDING).length,
-                [PROCESS_STATUS.DOCUMENTS_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.DOCUMENTS_COMPLETE).length,
-                [PROCESS_STATUS.ADMISSION_PENDING]: processes.filter(p => p.status === PROCESS_STATUS.ADMISSION_PENDING).length,
-                [PROCESS_STATUS.ADMISSION_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.ADMISSION_COMPLETE).length,
-                [PROCESS_STATUS.VISA_PENDING]: processes.filter(p => p.status === PROCESS_STATUS.VISA_PENDING).length,
-                [PROCESS_STATUS.VISA_COMPLETE]: processes.filter(p => p.status === PROCESS_STATUS.VISA_COMPLETE).length,
-                [PROCESS_STATUS.SUBMITTED]: processes.filter(p => p.status === PROCESS_STATUS.SUBMITTED).length,
-                [PROCESS_STATUS.DONE]: processes.filter(p => p.status === PROCESS_STATUS.DONE).length,
-                [PROCESS_STATUS.REJECTED]: processes.filter(p => p.status === PROCESS_STATUS.REJECTED).length,
-                [PROCESS_STATUS.CANCELLED]: processes.filter(p => p.status === PROCESS_STATUS.CANCELLED).length,
-            },
-            processes: processes
-        };
-
-        return metrics;
-    } catch (error) {
-        throw error;
-    }
-};
-
-// ============================================
-// ROUTES: STAFF METRICS
-// ============================================
-
-/**
- * GET /admin/metrics/staff?role=ACCOUNTANT
- * Get metrics for all staff, optionally filtered by role
- */
-router.get('/metrics/staff', requireAdmin, async (req, res) => {
-    try {
-        const { role } = req.query;
-
-        let staffQuery = {};
-        if (role) {
-            if (!Object.values(STAFF_ROLE).includes(role.toUpperCase())) {
-                return sendResponse(res, false, null, {
-                    status: 400,
-                    message: `Invalid staff role: ${role}`,
-                    code: 'INVALID_ROLE'
-                });
-            }
-            staffQuery.staffRole = role.toUpperCase();
-        }
-
-        const staff = await StaffProfile.find(staffQuery)
-            .populate('userId', 'email firstName lastName phone status')
-            .lean();
-
-        const metricsPromises = staff.map(async (s) => {
-            const staffRole = s.staffRole;
-
-            if (staffRole === STAFF_ROLE.ACCOUNTANT) {
-                return getAccountantMetrics(s._id);
-            } else if (staffRole === STAFF_ROLE.CONSULTANT) {
-                return getConsultantMetrics(s._id);
-            } else if (staffRole === STAFF_ROLE.AGENT) {
-                return getAgentMetrics(s._id);
-            } else if (staffRole === STAFF_ROLE.MANAGER) {
-                return getManagerMetrics(s._id);
-            }
-        });
-
-        const metrics = await Promise.all(metricsPromises);
-
-        const result = staff.map((s, idx) => ({
-            staffId: s._id,
-            userId: s.userId._id,
-            staffRole: s.staffRole,
-            email: s.userId.email,
-            firstName: s.userId.firstName,
-            lastName: s.userId.lastName,
-            verificationStatus: s.verificationStatus,
-            createdAt: s.createdAt,
-            metrics: metrics[idx]
-        }));
-
-        return sendResponse(res, true, result);
-    } catch (error) {
-        console.error('Error fetching staff metrics:', error);
-        return sendResponse(res, false, null, { status: 500, message: 'Failed to fetch staff metrics', code: 'METRICS_ERROR' });
-    }
-});
-
-/**
- * GET /admin/metrics/staff/:staffId
- * Get detailed metrics for a specific staff member
- */
-router.get('/metrics/staff/:staffId', requireAdmin, async (req, res) => {
-    try {
-        const { staffId } = req.params;
-
-        const staff = await StaffProfile.findById(staffId)
-            .populate('userId', 'email firstName lastName phone status');
-
-        if (!staff) {
-            return sendResponse(res, false, null, {
-                status: 404,
-                message: 'Staff member not found',
-                code: 'NOT_FOUND'
-            });
-        }
-
-        let metrics;
-        switch (staff.staffRole) {
-            case STAFF_ROLE.ACCOUNTANT:
-                metrics = await getAccountantMetrics(staffId);
-                break;
-            case STAFF_ROLE.CONSULTANT:
-                metrics = await getConsultantMetrics(staffId);
-                break;
-            case STAFF_ROLE.AGENT:
-                metrics = await getAgentMetrics(staffId);
-                break;
-            case STAFF_ROLE.MANAGER:
-                metrics = await getManagerMetrics(staffId);
-                break;
-            default:
-                metrics = {};
-        }
-
-        const result = {
-            staffId: staff._id,
-            userId: staff.userId._id,
-            staffRole: staff.staffRole,
-            email: staff.userId.email,
-            firstName: staff.userId.firstName,
-            lastName: staff.userId.lastName,
-            verificationStatus: staff.verificationStatus,
-            createdAt: staff.createdAt,
-            metrics
-        };
-
-        return sendResponse(res, true, result);
-    } catch (error) {
-        console.error('Error fetching staff metrics:', error);
-        return sendResponse(res, false, null, { status: 500, message: 'Failed to fetch staff metrics', code: 'METRICS_ERROR' });
-    }
-});
-
-/**
- * GET /admin/metrics/staff/role/:role
- * Get metrics for all staff of a specific role
- */
-router.get('/metrics/staff/role/:role', requireAdmin, async (req, res) => {
-    try {
-        const { role } = req.params;
-
-        if (!Object.values(STAFF_ROLE).includes(role.toUpperCase())) {
-            return sendResponse(res, false, null, {
-                status: 400,
-                message: `Invalid staff role: ${role}`,
-                code: 'INVALID_ROLE'
-            });
-        }
-
-        const staff = await StaffProfile.find({ staffRole: role.toUpperCase() })
-            .populate('userId', 'email firstName lastName phone status')
-            .lean();
-
-        const metricsPromises = staff.map(async (s) => {
-            const staffRole = s.staffRole;
-
-            if (staffRole === STAFF_ROLE.ACCOUNTANT) {
-                return getAccountantMetrics(s._id);
-            } else if (staffRole === STAFF_ROLE.CONSULTANT) {
-                return getConsultantMetrics(s._id);
-            } else if (staffRole === STAFF_ROLE.AGENT) {
-                return getAgentMetrics(s._id);
-            } else if (staffRole === STAFF_ROLE.MANAGER) {
-                return getManagerMetrics(s._id);
-            }
-        });
-
-        const metrics = await Promise.all(metricsPromises);
-
-        const result = staff.map((s, idx) => ({
-            staffId: s._id,
-            userId: s.userId._id,
-            staffRole: s.staffRole,
-            email: s.userId.email,
-            firstName: s.userId.firstName,
-            lastName: s.userId.lastName,
-            verificationStatus: s.verificationStatus,
-            createdAt: s.createdAt,
-            metrics: metrics[idx]
-        }));
-
-        return sendResponse(res, true, result);
-    } catch (error) {
-        console.error('Error fetching staff metrics by role:', error);
-        return sendResponse(res, false, null, { status: 500, message: 'Failed to fetch staff metrics', code: 'METRICS_ERROR' });
-    }
-});
 
 // ============================================
 // ROUTES: STAFF MANAGEMENT (Admin privileges)
@@ -598,6 +226,52 @@ router.patch('/staff/:staffId/role', requireAdmin, async (req, res) => {
         return sendResponse(res, true, populated);
     } catch (error) {
         return sendResponse(res, false, null, { status: 500, message: 'Failed to update staff role', code: 'UPDATE_ERROR' });
+    }
+});
+
+/**
+ * PATCH /admin/staff/:staffId/status
+ * Change staff verification status
+ */
+router.patch('/staff/:staffId/status', requireAdmin, async (req, res) => {
+    try {
+        const { staffId } = req.params;
+        const { verificationStatus } = req.body;
+
+        if (!verificationStatus) {
+            return sendResponse(res, false, null, {
+                status: 400,
+                message: 'Verification status is required',
+                code: 'STATUS_REQUIRED'
+            });
+        }
+
+        if (!Object.values(STAFF_VERIFICATION_STATUS).includes(verificationStatus.toUpperCase())) {
+            return sendResponse(res, false, null, {
+                status: 400,
+                message: 'Invalid verification status',
+                code: 'INVALID_STATUS'
+            });
+        }
+
+        const staff = await StaffProfile.findById(staffId);
+        if (!staff) {
+            return sendResponse(res, false, null, {
+                status: 404,
+                message: 'Staff member not found',
+                code: 'NOT_FOUND'
+            });
+        }
+
+        staff.verificationStatus = verificationStatus.toUpperCase();
+        await staff.save();
+
+        const populated = await StaffProfile.findById(staffId)
+            .populate('userId', 'email firstName lastName phone status');
+
+        return sendResponse(res, true, populated);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to update staff status', code: 'UPDATE_ERROR' });
     }
 });
 
@@ -953,12 +627,24 @@ router.put('/processes/:processId', requireAdmin, async (req, res) => {
 
 /**
  * PATCH /admin/processes/:processId/status
- * Change process status (with admin privileges)
+ * Change process status with flexible transitions (admin privileges)
+ * Allowed transitions:
+ * - PROGRESS → CANCELLED, DONE, VERIFIED, REJECTED
+ * - REFUND-PEND → REFUND-APPR, REFUND-REJC, REFUND-COMP
+ * - REFUND-APPR, REFUND-REJC, REFUND-COMP → REFUND-PEND
  */
 router.patch('/processes/:processId/status', requireAdmin, async (req, res) => {
     try {
         const { processId } = req.params;
         const { status, notes } = req.body;
+
+        if (!status) {
+            return sendResponse(res, false, null, {
+                status: 400,
+                message: 'Status is required',
+                code: 'MISSING_FIELDS'
+            });
+        }
 
         const process = await Process.findById(processId);
         if (!process) {
@@ -969,10 +655,47 @@ router.patch('/processes/:processId/status', requireAdmin, async (req, res) => {
             });
         }
 
-        const fakeUser = { _id: req.user._id, role: STAFF_ROLE.ADMIN };
-        await process.updateStatus(status, fakeUser, notes);
+        const currentStatus = process.status;
 
-        return sendResponse(res, true, process);
+        // Define flexible transition rules for admin
+        const allowedTransitions = {
+            [PROCESS_STATUS.PROGRESS]: [PROCESS_STATUS.CANCELLED, PROCESS_STATUS.DONE, PROCESS_STATUS.VERIFIED, PROCESS_STATUS.REJECTED],
+            [PROCESS_STATUS.REFUND_PENDING]: [PROCESS_STATUS.REFUND_APPROVED, PROCESS_STATUS.REFUND_REJECTED, PROCESS_STATUS.REFUND_COMPLETED],
+            [PROCESS_STATUS.REFUND_APPROVED]: [PROCESS_STATUS.REFUND_PENDING],
+            [PROCESS_STATUS.REFUND_REJECTED]: [PROCESS_STATUS.REFUND_PENDING],
+            [PROCESS_STATUS.REFUND_COMPLETED]: [PROCESS_STATUS.REFUND_PENDING]
+        };
+
+        // Check if transition is allowed
+        const allowed = allowedTransitions[currentStatus];
+        if (!allowed) {
+            return sendResponse(res, false, null, {
+                status: 400,
+                message: `Cannot change status from ${currentStatus}`,
+                code: 'INVALID_TRANSITION'
+            });
+        }
+
+        if (!allowed.includes(status)) {
+            return sendResponse(res, false, null, {
+                status: 400,
+                message: `Cannot transition from ${currentStatus} to ${status}`,
+                code: 'INVALID_TRANSITION'
+            });
+        }
+
+        process.status = status;
+        if (notes) process.notes = notes;
+        await process.save();
+
+        const populated = await Process.findById(processId)
+            .populate('studentId')
+            .populate('consultantId')
+            .populate('agentId')
+            .populate('universityId')
+            .populate('countryId');
+
+        return sendResponse(res, true, populated);
     } catch (error) {
         return sendResponse(res, false, null, { status: 400, message: error.message, code: 'STATUS_ERROR' });
     }
@@ -1211,6 +934,377 @@ router.get('/documents/:documentId', requireAdmin, async (req, res) => {
         return sendResponse(res, true, document);
     } catch (error) {
         return sendResponse(res, false, null, { status: 500, message: 'Failed to fetch document', code: 'FETCH_ERROR' });
+    }
+});
+
+/**
+ * PATCH /admin/documents/:documentId/status
+ * Change document status (any → any)
+ */
+router.patch('/documents/:documentId/status', requireAdmin, async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const { status } = req.body;
+
+        if (!status) {
+            return sendResponse(res, false, null, {
+                status: 400,
+                message: 'Status is required',
+                code: 'MISSING_FIELDS'
+            });
+        }
+
+        const document = await Document.findById(documentId);
+        if (!document) {
+            return sendResponse(res, false, null, {
+                status: 404,
+                message: 'Document not found',
+                code: 'NOT_FOUND'
+            });
+        }
+
+        if (!Object.values(DOCUMENT_STATUS).includes(status.toUpperCase())) {
+            return sendResponse(res, false, null, {
+                status: 400,
+                message: 'Invalid status',
+                code: 'INVALID_STATUS'
+            });
+        }
+
+        document.status = status.toUpperCase();
+        await document.save();
+
+        const populated = await Document.findById(documentId).populate('processId');
+        return sendResponse(res, true, populated);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 400, message: error.message, code: 'STATUS_ERROR' });
+    }
+});
+
+// ============================================
+// ROUTES: UNIVERSITY MANAGEMENT (Admin privileges)
+// ============================================
+
+/**
+ * GET /admin/universities
+ * Get all universities (including deactivated)
+ */
+router.get('/universities', requireAdmin, async (req, res) => {
+    try {
+        const { active } = req.query;
+        let query = {};
+
+        // If active is specified, filter by deactivatedAt
+        if (active === 'true') {
+            query.deactivatedAt = null;
+        } else if (active === 'false') {
+            query.deactivatedAt = { $ne: null };
+        }
+
+        const universities = await University.find(query)
+            .populate('country')
+            .sort({ name: 1 });
+
+        return sendResponse(res, true, universities);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to fetch universities', code: 'FETCH_ERROR' });
+    }
+});
+
+/**
+ * GET /admin/universities/:universityId
+ * Get a specific university
+ */
+router.get('/universities/:universityId', requireAdmin, async (req, res) => {
+    try {
+        const { universityId } = req.params;
+        const university = await University.findById(universityId).populate('country');
+
+        if (!university) {
+            return sendResponse(res, false, null, { status: 404, message: 'University not found', code: 'NOT_FOUND' });
+        }
+
+        return sendResponse(res, true, university);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to fetch university', code: 'FETCH_ERROR' });
+    }
+});
+
+/**
+ * POST /admin/universities
+ * Create a new university
+ */
+router.post('/universities', requireAdmin, async (req, res) => {
+    try {
+        const { name, country, code, website, location } = req.body;
+
+        if (!name || !country) {
+            return sendResponse(res, false, null, { status: 400, message: 'Name and country are required', code: 'MISSING_FIELDS' });
+        }
+
+        const countryDoc = await Country.findById(country);
+        if (!countryDoc) {
+            return sendResponse(res, false, null, { status: 404, message: 'Country not found', code: 'NOT_FOUND' });
+        }
+
+        const university = await University.create({
+            name: name.trim(),
+            country,
+            code: code || null,
+            website: website || null,
+            location: location || null
+        });
+
+        const populated = await University.findById(university._id).populate('country');
+        return sendResponse(res, true, populated);
+    } catch (error) {
+        if (error.name === 'ValidationError') {
+            return sendResponse(res, false, null, { status: 400, message: error.message, code: 'VALIDATION_ERROR' });
+        }
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to create university', code: 'CREATE_ERROR' });
+    }
+});
+
+/**
+ * PUT /admin/universities/:universityId
+ * Update a university
+ */
+router.put('/universities/:universityId', requireAdmin, async (req, res) => {
+    try {
+        const { universityId } = req.params;
+        const { name, country, code, website, location } = req.body;
+
+        const university = await University.findById(universityId);
+        if (!university) {
+            return sendResponse(res, false, null, { status: 404, message: 'University not found', code: 'NOT_FOUND' });
+        }
+
+        if (name !== undefined) university.name = name.trim();
+        if (country !== undefined) {
+            const countryDoc = await Country.findById(country);
+            if (!countryDoc) {
+                return sendResponse(res, false, null, { status: 404, message: 'Country not found', code: 'NOT_FOUND' });
+            }
+            university.country = country;
+        }
+        if (code !== undefined) university.code = code || null;
+        if (website !== undefined) university.website = website || null;
+        if (location !== undefined) university.location = location || null;
+
+        await university.save();
+        const populated = await University.findById(universityId).populate('country');
+        return sendResponse(res, true, populated);
+    } catch (error) {
+        if (error.name === 'ValidationError') {
+            return sendResponse(res, false, null, { status: 400, message: error.message, code: 'VALIDATION_ERROR' });
+        }
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to update university', code: 'UPDATE_ERROR' });
+    }
+});
+
+/**
+ * PATCH /admin/universities/:universityId/deactivate
+ * Deactivate a university
+ */
+router.patch('/universities/:universityId/deactivate', requireAdmin, async (req, res) => {
+    try {
+        const { universityId } = req.params;
+        const university = await University.findById(universityId);
+
+        if (!university) {
+            return sendResponse(res, false, null, { status: 404, message: 'University not found', code: 'NOT_FOUND' });
+        }
+
+        if (university.deactivatedAt) {
+            return sendResponse(res, false, null, { status: 400, message: 'University is already deactivated', code: 'ALREADY_DEACTIVATED' });
+        }
+
+        university.deactivatedAt = new Date();
+        await university.save();
+
+        const populated = await University.findById(universityId).populate('country');
+        return sendResponse(res, true, populated);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to deactivate university', code: 'DEACTIVATE_ERROR' });
+    }
+});
+
+/**
+ * PATCH /admin/universities/:universityId/activate
+ * Activate a university
+ */
+router.patch('/universities/:universityId/activate', requireAdmin, async (req, res) => {
+    try {
+        const { universityId } = req.params;
+        const university = await University.findById(universityId);
+
+        if (!university) {
+            return sendResponse(res, false, null, { status: 404, message: 'University not found', code: 'NOT_FOUND' });
+        }
+
+        if (!university.deactivatedAt) {
+            return sendResponse(res, false, null, { status: 400, message: 'University is already active', code: 'ALREADY_ACTIVE' });
+        }
+
+        university.deactivatedAt = null;
+        await university.save();
+
+        const populated = await University.findById(universityId).populate('country');
+        return sendResponse(res, true, populated);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to activate university', code: 'ACTIVATE_ERROR' });
+    }
+});
+
+// ============================================
+// ROUTES: COUNTRY MANAGEMENT (Admin privileges)
+// ============================================
+
+/**
+ * GET /admin/countries
+ * Get all countries (including deactivated)
+ */
+router.get('/countries', requireAdmin, async (req, res) => {
+    try {
+        const { active } = req.query;
+        let query = {};
+
+        if (active === 'true') {
+            query.deactivatedAt = null;
+        } else if (active === 'false') {
+            query.deactivatedAt = { $ne: null };
+        }
+
+        const countries = await Country.find(query).sort({ name: 1 });
+        return sendResponse(res, true, countries);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to fetch countries', code: 'FETCH_ERROR' });
+    }
+});
+
+/**
+ * GET /admin/countries/:countryId
+ * Get a specific country
+ */
+router.get('/countries/:countryId', requireAdmin, async (req, res) => {
+    try {
+        const { countryId } = req.params;
+        const country = await Country.findById(countryId);
+
+        if (!country) {
+            return sendResponse(res, false, null, { status: 404, message: 'Country not found', code: 'NOT_FOUND' });
+        }
+
+        return sendResponse(res, true, country);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to fetch country', code: 'FETCH_ERROR' });
+    }
+});
+
+/**
+ * POST /admin/countries
+ * Create a new country
+ */
+router.post('/countries', requireAdmin, async (req, res) => {
+    try {
+        const { name, code, flag } = req.body;
+
+        if (!name) {
+            return sendResponse(res, false, null, { status: 400, message: 'Country name is required', code: 'MISSING_FIELDS' });
+        }
+
+        const country = await Country.create({
+            name: name.trim(),
+            code: code || null,
+            flag: flag || null
+        });
+
+        return sendResponse(res, true, country);
+    } catch (error) {
+        if (error.name === 'ValidationError') {
+            return sendResponse(res, false, null, { status: 400, message: error.message, code: 'VALIDATION_ERROR' });
+        }
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to create country', code: 'CREATE_ERROR' });
+    }
+});
+
+/**
+ * PUT /admin/countries/:countryId
+ * Update a country
+ */
+router.put('/countries/:countryId', requireAdmin, async (req, res) => {
+    try {
+        const { countryId } = req.params;
+        const { name, code, flag } = req.body;
+
+        const country = await Country.findById(countryId);
+        if (!country) {
+            return sendResponse(res, false, null, { status: 404, message: 'Country not found', code: 'NOT_FOUND' });
+        }
+
+        if (name !== undefined) country.name = name.trim();
+        if (code !== undefined) country.code = code || null;
+        if (flag !== undefined) country.flag = flag || null;
+
+        await country.save();
+        return sendResponse(res, true, country);
+    } catch (error) {
+        if (error.name === 'ValidationError') {
+            return sendResponse(res, false, null, { status: 400, message: error.message, code: 'VALIDATION_ERROR' });
+        }
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to update country', code: 'UPDATE_ERROR' });
+    }
+});
+
+/**
+ * PATCH /admin/countries/:countryId/deactivate
+ * Deactivate a country
+ */
+router.patch('/countries/:countryId/deactivate', requireAdmin, async (req, res) => {
+    try {
+        const { countryId } = req.params;
+        const country = await Country.findById(countryId);
+
+        if (!country) {
+            return sendResponse(res, false, null, { status: 404, message: 'Country not found', code: 'NOT_FOUND' });
+        }
+
+        if (country.deactivatedAt) {
+            return sendResponse(res, false, null, { status: 400, message: 'Country is already deactivated', code: 'ALREADY_DEACTIVATED' });
+        }
+
+        country.deactivatedAt = new Date();
+        await country.save();
+
+        return sendResponse(res, true, country);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to deactivate country', code: 'DEACTIVATE_ERROR' });
+    }
+});
+
+/**
+ * PATCH /admin/countries/:countryId/activate
+ * Activate a country
+ */
+router.patch('/countries/:countryId/activate', requireAdmin, async (req, res) => {
+    try {
+        const { countryId } = req.params;
+        const country = await Country.findById(countryId);
+
+        if (!country) {
+            return sendResponse(res, false, null, { status: 404, message: 'Country not found', code: 'NOT_FOUND' });
+        }
+
+        if (!country.deactivatedAt) {
+            return sendResponse(res, false, null, { status: 400, message: 'Country is already active', code: 'ALREADY_ACTIVE' });
+        }
+
+        country.deactivatedAt = null;
+        await country.save();
+
+        return sendResponse(res, true, country);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to activate country', code: 'ACTIVATE_ERROR' });
     }
 });
 

@@ -9,6 +9,7 @@ import Invoice, { INVOICE_STATUS, INVOICE_PAYMENT_TYPE } from '../../models/Invo
 import Task, { TASK_STATUS } from '../../models/Task/Tasks.mjs';
 import Document, { DOCUMENT_STATUS } from '../../models/Docx/Document.mjs';
 import { attachUser, requireRole, requireOnboardingComplete } from '../../middlewares/Auth.mjs';
+import { uploadSingle } from '../../middlewares/upload.mjs';
 
 const router = express.Router();
 
@@ -322,15 +323,15 @@ router.get('/applications/:applicationId/documents', requireStudent, async (req,
 });
 
 // POST upload document (only if status is PENDING or UPLOADED)
-router.post('/applications/:applicationId/documents/:documentId/upload', requireStudent, async (req, res) => {
+router.post('/applications/:applicationId/documents/:documentId/upload', requireStudent, uploadSingle('file'), async (req, res) => {
     try {
         const { applicationId, documentId } = req.params;
-        const { filePath } = req.body;
         const user = req.user;
         const studentProfile = await StudentProfile.findOne({ userId: user._id });
 
-        if (!filePath) {
-            return res.status(400).json({ success: false, message: 'File path is required' });
+        const fileInfo = req.fileInfo;
+        if (!fileInfo || !fileInfo.path) {
+            return res.status(400).json({ success: false, message: 'File upload failed or not provided' });
         }
 
         const process = await Process.findOne({ _id: applicationId, studentId: studentProfile._id });
@@ -350,8 +351,8 @@ router.post('/applications/:applicationId/documents/:documentId/upload', require
             });
         }
 
-        // Use the upload method to handle state changes
-        await doc.upload(user._id, filePath);
+        // Use the upload method to handle state changes. Pass stored uploads path
+        await doc.upload(user._id, fileInfo.path);
         return res.status(200).json({
             success: true,
             message: 'Document uploaded successfully',
@@ -401,17 +402,18 @@ router.get('/applications/:applicationId/invoices', requireStudent, async (req, 
 });
 
 // POST upload invoice payment screenshot (append to paymentTracking array)
-router.post('/applications/:applicationId/invoices/:invoiceId/upload-payment', requireStudent, async (req, res) => {
+router.post('/applications/:applicationId/invoices/:invoiceId/upload-payment', requireStudent, uploadSingle('file'), async (req, res) => {
     try {
         const { applicationId, invoiceId } = req.params;
-        const { paymentMethod, transactionId, filePath } = req.body;
+        const { paymentMethod, transactionId } = req.body;
+        const fileInfo = req.fileInfo;
         const user = req.user;
         const studentProfile = await StudentProfile.findOne({ userId: user._id });
 
-        if (!paymentMethod || !filePath) {
+        if (!paymentMethod || !fileInfo || !fileInfo.path) {
             return res.status(400).json({
                 success: false,
-                message: 'Payment method and file path are required'
+                message: 'Payment method and file upload are required'
             });
         }
 
@@ -425,11 +427,11 @@ router.post('/applications/:applicationId/invoices/:invoiceId/upload-payment', r
             return res.status(404).json({ success: false, message: 'Invoice not found' });
         }
 
-        // Append to paymentTracking array
+        // Append to paymentTracking array using stored uploads path
         invoice.paymentTracking.push({
             paymentMethod,
             transactionId: transactionId || null,
-            filePath,
+            filePath: fileInfo.path,
             recordedBy: user._id,
             recordedAt: new Date(),
             status: 'PENDING'

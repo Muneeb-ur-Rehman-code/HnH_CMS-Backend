@@ -13,6 +13,7 @@ import StaffProfile, { STAFF_ROLE as ACCOUNTANT_ROLE } from '../../models/Users/
 import Task, { TASK_STATUS } from '../../models/Task/Tasks.mjs';
 import Document from '../../models/Docx/Document.mjs';
 import { INVOICE_STATUS } from '../../models/Invoice/Invoice.mjs';
+import { uploadSingle } from '../../middlewares/upload.mjs';
 
 const router = express.Router();
 
@@ -540,7 +541,7 @@ router.put('/documents/:documentId', async (req, res) => {
 });
 
 // Upload file to a document (only if not withdrawn)
-router.post('/documents/:documentId/upload', async (req, res) => {
+router.post('/documents/:documentId/upload', uploadSingle('file'), async (req, res) => {
     try {
         const { documentId } = req.params;
         const userId = req.user && req.user._id;
@@ -553,14 +554,14 @@ router.post('/documents/:documentId/upload', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot upload to withdrawn documents' });
         }
 
-        // Get file path from request (assuming file upload middleware provides it)
-        const { filePath } = req.body;
-        if (!filePath) {
-            return res.status(400).json({ success: false, message: 'File path is required' });
+        // Multer middleware attaches `req.fileInfo` (see middlewares/upload.mjs)
+        const fileInfo = req.fileInfo;
+        if (!fileInfo || !fileInfo.path) {
+            return res.status(400).json({ success: false, message: 'File upload failed or file not provided' });
         }
 
-        // Use the document's upload method
-        await doc.upload(userId, filePath);
+        // Use the document's upload method with the stored uploads path
+        await doc.upload(userId, fileInfo.path);
         return res.status(200).json({ success: true, message: 'File uploaded successfully', data: doc });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });

@@ -4,6 +4,7 @@ import { STAFF_ROLE } from '../../models/Users/StaffProfile.mjs';
 import Invoice, { INVOICE_STATUS, PAYMENT_METHOD } from '../../models/Invoice/Invoice.mjs';
 import Process from '../../models/Process/Process.mjs';
 import { PROCESS_STATUS } from '../../config/enums.mjs';
+import { uploadSingle } from '../../middlewares/upload.mjs';
 
 const router = express.Router();
 
@@ -166,6 +167,52 @@ router.patch('/invoices/:invoiceId/unassign', async (req, res) => {
         return sendResponse(res, true, invoice);
     } catch (error) {
         return sendResponse(res, false, null, { status: 500, message: 'Failed to unassign invoice', code: 'UNASSIGN_ERROR' });
+    }
+});
+
+// Accountant: upload payment tracking (can upload & auto-verify)
+router.post('/invoices/:invoiceId/payment-tracking', uploadSingle('file'), async (req, res) => {
+    try {
+        const { invoiceId } = req.params;
+        const { paymentMethod, transactionId, amount } = req.body;
+        const fileInfo = req.fileInfo;
+
+        const invoice = await Invoice.findById(invoiceId);
+        if (!invoice || invoice.accountantId?.toString() !== req.user.staffProfile._id.toString()) {
+            return sendResponse(res, false, null, { status: 404, message: 'Invoice not found or not assigned to you.', code: 'NOT_FOUND' });
+        }
+
+        if (!paymentMethod && !fileInfo) {
+            return sendResponse(res, false, null, { status: 400, message: 'At least a paymentMethod or file is required', code: 'MISSING_DATA' });
+        }
+
+        // Build tracking record
+        const tracking = {
+            paymentMethod: paymentMethod || null,
+            transactionId: transactionId || null,
+            filePath: fileInfo?.path || null,
+            recordedBy: req.user.staffProfile._id,
+            recordedAt: new Date(),
+            status: 'APPROVED', // accountant uploads are auto-reviewed/approved
+            reviewedBy: req.user.staffProfile._id,
+            reviewedAt: new Date()
+        };
+
+        invoice.paymentTracking = invoice.paymentTracking || [];
+        invoice.paymentTracking.push(tracking);
+
+        // Optionally update invoice status to PAYMENT_RECEIVED
+        if (invoice.status === INVOICE_STATUS.PENDING) {
+            invoice.status = INVOICE_STATUS.PAYMENT_RECEIVED;
+        }
+
+        // Allow updating amount if provided by accountant
+        if (amount !== undefined) invoice.amount = amount;
+
+        await invoice.save();
+        return sendResponse(res, true, invoice);
+    } catch (error) {
+        return sendResponse(res, false, null, { status: 500, message: 'Failed to upload payment tracking', code: 'UPLOAD_ERROR' });
     }
 });
 

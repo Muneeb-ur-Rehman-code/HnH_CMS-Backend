@@ -42,8 +42,8 @@ router.use('/student', StudentRoutes);
 
 router.use('/receptionist', requireRecept, receptionistRoutes);
 router.use('/accountant', AccountantAuth, accountantRoutes);
-router.use('/consultant', ConsulAuth, studyattach, ConsultantRoutes);
-router.use('/visit', VisitAuth, visitattach, ConsultantRoutes);
+router.use('/consultant/study', ConsulAuth, studyattach, ConsultantRoutes);
+router.use('/consultant/visit', VisitAuth, visitattach, ConsultantRoutes);
 
 // Agent routes with study/visit separation
 router.use('/agent/study', AgentAuth, studyattach, AgentRoutes);

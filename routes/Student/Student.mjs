@@ -5,7 +5,7 @@ import User, { USER_ROLE, USER_STATUS, USER_SOURCE } from '../../models/Users/_U
 import Initial, { INITIAL_STATUS, INITIAL_TYPE } from '../../models/initial/Initial.mjs';
 import Process from '../../models/Process/Process.mjs';
 import { PROCESS_STATUS } from '../../config/enums.mjs';
-import Invoice, { INVOICE_STATUS, INVOICE_PAYMENT_TYPE } from '../../models/Invoice/Invoice.mjs';
+import Invoice, { INVOICE_STATUS, INVOICE_PAYMENT_TYPE, PAYMENT_METHOD } from '../../models/Invoice/Invoice.mjs';
 import Task, { TASK_STATUS } from '../../models/Task/Tasks.mjs';
 import Document, { DOCUMENT_STATUS } from '../../models/Docx/Document.mjs';
 import { attachUser, requireRole, requireOnboardingComplete } from '../../middlewares/Auth.mjs';
@@ -405,12 +405,12 @@ router.get('/applications/:applicationId/invoices', requireStudent, async (req, 
 router.post('/applications/:applicationId/invoices/:invoiceId/upload-payment', requireStudent, uploadSingle('file'), async (req, res) => {
     try {
         const { applicationId, invoiceId } = req.params;
-        const { paymentMethod, transactionId } = req.body;
+        const { transactionId } = req.body;
         const fileInfo = req.fileInfo;
         const user = req.user;
         const studentProfile = await StudentProfile.findOne({ userId: user._id });
 
-        if (!paymentMethod || !fileInfo || !fileInfo.path) {
+        if (!fileInfo || !fileInfo.path) {
             return res.status(400).json({
                 success: false,
                 message: 'Payment method and file upload are required'
@@ -429,7 +429,7 @@ router.post('/applications/:applicationId/invoices/:invoiceId/upload-payment', r
 
         // Append to paymentTracking array using stored uploads path
         invoice.paymentTracking.push({
-            paymentMethod,
+            paymentMethod : PAYMENT_METHOD.ONLINE,
             transactionId: transactionId || null,
             filePath: fileInfo.path,
             recordedBy: user._id,
@@ -438,9 +438,9 @@ router.post('/applications/:applicationId/invoices/:invoiceId/upload-payment', r
         });
 
         // Change invoice status to PAYMENT_RECEIVED if not already
-        if (invoice.status === INVOICE_STATUS.PENDING) {
-            invoice.status = INVOICE_STATUS.PAYMENT_RECEIVED;
-        }
+        // if (invoice.status === INVOICE_STATUS.PENDING) {
+        invoice.status = INVOICE_STATUS.PAYMENT_RECEIVED;
+        // }
 
         await invoice.save();
         return res.status(200).json({

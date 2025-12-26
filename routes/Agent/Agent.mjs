@@ -7,6 +7,7 @@ import { PROCESS_STATUS } from '../../config/enums.mjs';
 import { TASK_STATUS } from '../../models/Task/Tasks.mjs';
 import Task from '../../models/Task/Tasks.mjs';
 import Document from '../../models/Docx/Document.mjs';
+import { uploadSingle } from '../../middlewares/upload.mjs';
 
 const router = express.Router();
 
@@ -17,7 +18,6 @@ const router = express.Router();
 // Get all unassigned processes of type PROGRESS
 router.get('/unassigned-processes', async (req, res) => {
     try {
-        const rtype = req.rtype; // 'STUDY' or 'VISIT' from middleware
         const query = {
             status: PROCESS_STATUS.PROGRESS,
             agentId: null
@@ -279,7 +279,7 @@ router.put('/documents/:documentId', async (req, res) => {
 });
 
 // Upload file to a document (only if not withdrawn)
-router.post('/documents/:documentId/upload', async (req, res) => {
+router.post('/documents/:documentId/upload', uploadSingle('file'), async (req, res) => {
     try {
         const { documentId } = req.params;
         const userId = req.user && req.user._id;

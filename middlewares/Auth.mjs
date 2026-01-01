@@ -13,6 +13,8 @@ import { STAFF_VERIFICATION_STATUS, STAFF_ROLE } from '../models/Users/StaffProf
 
 async function attachUserCore(req) {
     const authHeader = req.headers.authorization;
+    console.log('--- RAW HEADER RECEIVED ---');
+    console.log(`"${authHeader}"`);
 
     if (!authHeader) {
         const err = new Error('No authorization token provided');

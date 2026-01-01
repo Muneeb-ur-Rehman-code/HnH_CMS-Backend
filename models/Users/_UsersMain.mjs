@@ -263,13 +263,6 @@ userSchema.index({ createdAt: -1 });
 
 
 
-
-
-
-
-
-
-
 userSchema.statics.validatePasswordStrength = function (password) {
     const errors = [];
 
@@ -399,7 +392,7 @@ userSchema.methods.generateEmailOtp = async function () {
         attempts: 0,
         lastAttemptAt: null,
         lastSentAt: now,
-        verified: false
+        verified: isDev
     };
 
     await user.save();
@@ -496,7 +489,7 @@ userSchema.methods.setPhoneAndGenerateOtp = async function (phoneNumber) {
             attempts: 0,
             lastAttemptAt: null,
             lastSentAt: now,
-            verified: false
+            verified: isDev
         }
     };
 

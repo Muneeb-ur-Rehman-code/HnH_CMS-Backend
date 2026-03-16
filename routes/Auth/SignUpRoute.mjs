@@ -320,11 +320,12 @@ router.post('/set-password', async (req, res) => {
         // Issue a normal auth token (uses default expiry from env/JWT_EXPIRY)
         const authToken = generateToken({ userId: user._id.toString() });
 
-        user.updateLastLogin();
+        await user.updateLastLogin();
 
         return res.status(200).json({
             success: true,
             message: 'Password set successfully',
+            token: authToken,
             data: {
                 email: normalizedEmail,
                 token: authToken

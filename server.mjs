@@ -30,9 +30,34 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// --- CORS (explicit, browser-friendly for SPA + Authorization preflight) ---
+// Default: allow any Origin (reflected). Set CORS_ORIGINS="https://a.com,https://b.com" to restrict.
+const corsOriginsEnv = process.env.CORS_ORIGINS;
+const corsAllowList =
+    corsOriginsEnv && corsOriginsEnv !== '*'
+        ? corsOriginsEnv.split(',').map((s) => s.trim()).filter(Boolean)
+        : null;
+
+const corsOptions = {
+    origin(origin, callback) {
+        if (!origin) return callback(null, true);
+        if (corsAllowList && corsAllowList.length > 0) {
+            if (corsAllowList.includes(origin)) return callback(null, true);
+            return callback(new Error(`CORS: origin not allowed: ${origin}`));
+        }
+        return callback(null, true);
+    },
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    // Omit allowedHeaders so preflight mirrors Access-Control-Request-Headers (avoids blocking custom headers)
+    exposedHeaders: ['Content-Length', 'Content-Type'],
+    maxAge: 86_400,
+    optionsSuccessStatus: 204,
+};
+
 //====================================================GLOBAL MIDDLEWARES
 
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(logger(false));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

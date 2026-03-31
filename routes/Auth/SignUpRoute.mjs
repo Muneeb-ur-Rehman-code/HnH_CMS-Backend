@@ -134,15 +134,7 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
-        // Verify OTP
-        const result = await user.verifyEmailOtp(otp);
-
-        if (!result.success) {
-            return res.status(400).json({
-                success: false,
-                message: result.message
-            });
-        }
+        await user.verifyEmailOtp(otp);
 
         // Generate a short-lived action token for completing signup (setting password)
         const token = generateToken({ userId: user._id.toString(), purpose: 'set_password' }, { expiresIn: '15m' });

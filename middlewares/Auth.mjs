@@ -13,8 +13,6 @@ import { STAFF_VERIFICATION_STATUS, STAFF_ROLE } from '../models/Users/StaffProf
 
 async function attachUserCore(req) {
     const authHeader = req.headers.authorization;
-    console.log('--- RAW HEADER RECEIVED ---');
-    console.log(`"${authHeader}"`);
 
     if (!authHeader) {
         const err = new Error('No authorization token provided');
@@ -69,10 +67,8 @@ export const optionalAttachUser = async (req, res, next) => {
         if (!authHeader) return next();
 
         await attachUserCore(req);
-        console.log(req.user)
         return next();
     } catch (error) {
-        console.log(error);
         return next();
     }
 };

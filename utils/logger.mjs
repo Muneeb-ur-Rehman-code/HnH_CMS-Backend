@@ -9,15 +9,36 @@ import {
     GRAY
 } from '../config/constants.mjs';
 
+/** Shallow clone and redact common secret fields from request bodies in logs. */
+const sanitizeBodyForLog = (body) => {
+    if (!body || typeof body !== 'object') return body;
+    if (Array.isArray(body)) return body;
+    const sensitive = new Set(['password', 'oldpassword', 'newpassword', 'token', 'otp', 'refreshtoken']);
+    const out = { ...body };
+    for (const k of Object.keys(out)) {
+        if (sensitive.has(k.toLowerCase())) out[k] = '[redacted]';
+    }
+    return out;
+};
+
+const redactSensitive = (key, value) => {
+    const k = String(key).toLowerCase();
+    if ((k === 'authorization' || k === 'cookie' || k === 'set-cookie') && typeof value === 'string') {
+        return value.length > 14 ? `${value.slice(0, 10)}…[redacted]` : '[redacted]';
+    }
+    return value;
+};
+
 const safeStringify = (obj) => {
     try {
         return JSON.stringify(obj, (key, value) => {
-            if (typeof value === 'object' && value !== null) {
+            const v = redactSensitive(key, value);
+            if (typeof v === 'object' && v !== null) {
                 if (key.length > 0 && obj !== value && typeof obj[key] === 'object' && obj[key] !== null) {
                     return '[Circular]';
                 }
             }
-            return value;
+            return v;
         }, 2);
     } catch (e) {
         return '[Object could not be stringified due to error]';
@@ -48,7 +69,7 @@ export const logger = (isDetailed = false) => (req, res, next) => {
         console.log(safeStringify(req.params));
 
         console.log(`\n${BLUE}BODY:${RESET}`);
-        console.log(safeStringify(req.body));
+        console.log(safeStringify(sanitizeBodyForLog(req.body)));
 
         if (req.user) {
             console.log(`\n${CYAN}AUTHENTICATED USER:${RESET}`);
@@ -66,7 +87,7 @@ export const logger = (isDetailed = false) => (req, res, next) => {
             return Object.keys(obj).length > 0 ? JSON.stringify(obj) : emptyMsg;
         };
 
-        const bodyContent = safeLogContent(req.body, 'No Body');
+        const bodyContent = safeLogContent(sanitizeBodyForLog(req.body), 'No Body');
         const paramsContent = safeLogContent(req.params, 'No Params');
         const queryContent = safeLogContent(req.query, 'No Query');
 
@@ -76,7 +97,7 @@ export const logger = (isDetailed = false) => (req, res, next) => {
 
         console.log(`${BLUE}Method: ${methodColor}${req.method}${RESET}`);
         console.log(`${BLUE}Timestamp: ${CYAN}${timestamp}${RESET}`);
-        console.log(`${BLUE}IP:     ${CYAN}${req.ipRESET}`);
+        console.log(`${BLUE}IP:     ${CYAN}${req.ip || 'N/A'}${RESET}`);
         console.log(`${BLUE}Path:   ${CYAN}${req.originalUrl}${RESET}`);
         console.log(`${BLUE}Body:   ${MAGENTA}${bodyContent}${RESET}`);
         console.log(`${BLUE}Params: ${MAGENTA}${paramsContent}${RESET}`);

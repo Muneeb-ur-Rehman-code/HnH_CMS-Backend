@@ -114,6 +114,85 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// /api/auth/staff/complete-setup — magic-link: set first password for invited staff (JWT in body)
+router.post('/staff/complete-setup', async (req, res) => {
+    try {
+        const { token, password } = req.body || {};
+
+        if (!token || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token and password are required'
+            });
+        }
+
+        let decoded;
+        try {
+            decoded = verifyToken(typeof token === 'string' ? token : '');
+        } catch (err) {
+            return res.status(401).json({
+                success: false,
+                message: err.message || 'Invalid or expired token'
+            });
+        }
+
+        const purpose = decoded.purpose;
+        const allowedPurposes = ['staff_setup', 'set_password', 'complete_setup'];
+        if (!purpose || !allowedPurposes.includes(purpose)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Invalid token for this action'
+            });
+        }
+
+        const user = await User.findById(decoded.userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        if (user.role !== USER_ROLE.STAFF) {
+            return res.status(403).json({
+                success: false,
+                message: 'This link is only for staff accounts'
+            });
+        }
+
+        if (await user.hasPasswordAsync()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password already set. Please log in.',
+                code: 'PASSWORD_ALREADY_SET'
+            });
+        }
+
+        await user.setPassword(password);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Password set successfully. You can now log in.'
+        });
+    } catch (error) {
+        console.error('Staff complete-setup error:', error);
+
+        const msg = error.message || '';
+        if (msg.includes('Password must') || msg.includes('complexity') || msg.includes('at least')) {
+            return res.status(400).json({
+                success: false,
+                message: msg
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to complete setup',
+            error: error.message
+        });
+    }
+});
+
 // /api/auth/logout
 router.post('/logout', (req, res) => {
     // Dummy endpoint

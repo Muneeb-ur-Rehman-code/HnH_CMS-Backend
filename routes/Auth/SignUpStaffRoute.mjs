@@ -9,6 +9,51 @@ import { generateToken } from '../../middlewares/jwt.mjs';
 
 const router = express.Router();
 
+// GET /api/auth/signup-staff/status?email=
+router.get('/status', async (req, res) => {
+    try {
+        const email = req.query.email;
+        if (!email || typeof email !== 'string') {
+            return res.status(400).json({
+                success: false,
+                message: 'Email is required'
+            });
+        }
+
+        const normalizedEmail = email.toLowerCase().trim();
+        const user = await User.findOne({ email: normalizedEmail });
+
+        if (!user) {
+            return res.status(200).json({
+                success: true,
+                data: {
+                    exists: false,
+                    hasPassword: false,
+                    emailVerified: false
+                }
+            });
+        }
+
+        const hasPassword = await user.hasPasswordAsync();
+        const emailVerified = await user.isEmailVerifiedAsync();
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                exists: true,
+                hasPassword,
+                emailVerified
+            }
+        });
+    } catch (error) {
+        console.error('Staff signup status error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to load signup status',
+            error: error.message
+        });
+    }
+});
 
 // /api/auth/signup-staff/send-email-otp
 router.post('/send-email-otp', async (req, res) => {
@@ -119,14 +164,7 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
-        const result = await user.verifyEmailOtp(otp);
-
-        if (!result.success) {
-            return res.status(400).json({
-                success: false,
-                message: result.message
-            });
-        }
+        await user.verifyEmailOtp(otp);
 
         let staffProfile = await StaffProfile.findOne({ userId: user._id });
 

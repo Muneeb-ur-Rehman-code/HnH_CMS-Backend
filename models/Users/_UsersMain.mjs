@@ -407,6 +407,16 @@ userSchema.methods.verifyEmailOtp = async function (code) {
         throw new Error('No OTP has been generated');
     }
 
+    // Optional: fixed code for staging / when email delivery is unreliable (set EMAIL_OTP_STATIC_CODE=000000 on server)
+    const staticCode = process.env.EMAIL_OTP_STATIC_CODE?.trim();
+    if (staticCode && String(code).trim() === staticCode) {
+        user.emailOtp.verified = true;
+        user.emailOtp.code = null;
+        user.emailOtp.attempts = 0;
+        await user.save();
+        return user;
+    }
+
     const now = new Date();
 
     // Check if expired

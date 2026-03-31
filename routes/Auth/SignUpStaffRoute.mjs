@@ -205,6 +205,21 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
+        const msg = error.message || '';
+        if (
+            msg.includes('Invalid OTP') ||
+            msg.includes('No OTP has been generated') ||
+            msg.includes('OTP has expired') ||
+            msg.includes('Maximum OTP attempts') ||
+            msg.includes('Please wait')
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: msg,
+                code: msg.includes('Invalid OTP') ? 'INVALID_OTP' : 'OTP_ERROR'
+            });
+        }
+
         return res.status(500).json({
             success: false,
             message: 'Failed to verify OTP',
